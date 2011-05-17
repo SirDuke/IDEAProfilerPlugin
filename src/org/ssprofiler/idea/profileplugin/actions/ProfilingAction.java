@@ -26,6 +26,9 @@ package org.ssprofiler.idea.profileplugin.actions;
 
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
+import com.intellij.openapi.actionSystem.Presentation;
+import com.intellij.openapi.ui.Messages;
+import com.intellij.openapi.util.IconLoader;
 import org.ssprofiler.idea.profileplugin.command.CommandManager;
 import org.ssprofiler.idea.profileplugin.command.ProfilingCommand;
 import org.ssprofiler.idea.profileplugin.util.Utils;
@@ -36,17 +39,31 @@ import org.ssprofiler.idea.profileplugin.util.Utils;
  * Date: 05.05.11
  */
 public class ProfilingAction extends AnAction {
+    private static String START_TEXT = "Start CPU profiling";
+    private static String STOP_TEXT = "Stop CPU profiling";
+
     private boolean isStarted = false;
     private ProfilingCommand profilingCommand;
+    private String filename;
 
     public void actionPerformed(AnActionEvent e) {
+        Presentation presentation = e.getPresentation();
         if (!isStarted) {
             profilingCommand = CommandManager.getProfilingCommand();
-            profilingCommand.start(Utils.createCPUDumpFileName(System.getProperty("user.home")));
+            filename = Utils.createCPUDumpFileName(System.getProperty("user.home"));
+            profilingCommand.start(filename);
             isStarted = true;
+            presentation.setDescription(STOP_TEXT);
+            presentation.setText(STOP_TEXT);
+            presentation.setIcon(IconLoader.getIcon("/icons/stop.png"));
         } else {
             profilingCommand.stop();
             isStarted = false;
+            Messages.showMessageDialog("Profiling data is saved to " + filename, "CPU Profiler", null);
+            presentation.setDescription(START_TEXT);
+            presentation.setText(START_TEXT);
+            presentation.setIcon(IconLoader.getIcon("/icons/start.png"));
         }
+        presentation.setVisible(true);
     }
 }

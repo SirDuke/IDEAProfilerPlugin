@@ -35,7 +35,7 @@ import java.util.Date;
  * Date: 09.05.11
  */
 public class Utils {
-    private static final String DATE_FORMAT_PATTERN = "HHmmss_ddmmyyyy";
+    private static final String DATE_FORMAT_PATTERN = "HHmmss_ddMMyyyy";
 
     public static DateFormat getDateFormat() {
         return new SimpleDateFormat(DATE_FORMAT_PATTERN);

@@ -8,6 +8,7 @@
     </content>
     <orderEntry type="jdk" jdkName="IDEA IC-103.255" jdkType="IDEA JDK" />
     <orderEntry type="sourceFolder" forTests="false" />
+    <orderEntry type="library" name="Oktech" level="project" />
   </component>
 </module>
 

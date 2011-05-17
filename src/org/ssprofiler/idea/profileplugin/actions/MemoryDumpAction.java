@@ -26,6 +26,7 @@ package org.ssprofiler.idea.profileplugin.actions;
 
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
+import com.intellij.openapi.ui.Messages;
 import org.ssprofiler.idea.profileplugin.command.CommandManager;
 import org.ssprofiler.idea.profileplugin.util.Utils;
 
@@ -40,5 +41,6 @@ public class MemoryDumpAction extends AnAction {
     public void actionPerformed(AnActionEvent e) {
         String filename = Utils.createHeapDumpFileName(System.getProperty("user.home"));
         CommandManager.getMemoryDumpCommand().dump(filename);
+        Messages.showMessageDialog("Heap dump is saved to " + filename, "Memory dump", null);
     }
 }

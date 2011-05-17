@@ -16,11 +16,11 @@
   <actions>
     <!-- Add your actions here -->
       <action id="IDEAProfilerPlugin.MemoryDump" class="org.ssprofiler.idea.profileplugin.actions.MemoryDumpAction"
-              text="Memory Dump" description="Do Memory Dump">
+              text="Memory Dump" description="Do Memory Dump" icon="/icons/memory.png" >
           <add-to-group group-id="ToolbarRunGroup" anchor="last"/>
       </action>
       <action id="ProfilingAction" class="org.ssprofiler.idea.profileplugin.actions.ProfilingAction"
-              text="Start/Stop profiling" description="Start/Stop profiling">
+              text="Start CPU profiling" description="Start CPU profiling" icon="/icons/start.png">
           <add-to-group group-id="ToolbarRunGroup" anchor="last"/>
       </action>
       <action id="IDEAProfilerPlugin.viewCPUReport" class="org.ssprofiler.idea.profileplugin.actions.ViewCPUReportAction"
