@@ -39,10 +39,9 @@ import javax.swing.tree.DefaultTreeModel;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
-import java.util.Date;
-import java.util.Iterator;
+import java.text.SimpleDateFormat;
+import java.util.*;
 import java.util.List;
-import java.util.Map;
 
 /**
  * Created by IntelliJ IDEA.
@@ -94,7 +93,7 @@ public class OktechCPUReportPanel extends DialogWrapper {
         JTree jTree = new com.intellij.ui.treeStructure.Tree(new DefaultTreeModel(new DefaultMutableTreeNode("Select time at the chart above to view stacktraces")));
         panelMemory.add(new JBScrollPane(jTree));
 
-        mmc.addMouseListener(new ChartMouseListenter(jTree, threadDataMap, minTime, maxTime));
+        mmc.addMouseListener(new ChartMouseListenter(jTree, threadDataMap, memoryDataList, minTime, maxTime));
     }
 
     private void initCPUChartPanel() {
@@ -106,7 +105,7 @@ public class OktechCPUReportPanel extends DialogWrapper {
         JTree jTree = new com.intellij.ui.treeStructure.Tree(new DefaultTreeModel(new DefaultMutableTreeNode("Select time at the chart above to view stacktraces")));
         panelCPUChart.add(new JBScrollPane(jTree));
 
-        tcc.addMouseListener(new ChartMouseListenter(jTree, threadDataMap, minTime, maxTime));
+        tcc.addMouseListener(new ChartMouseListenter(jTree, threadDataMap, memoryDataList, minTime, maxTime));
     }
 
     private void initSampingTreePanel(Tree samplingTree) {
@@ -213,14 +212,17 @@ public class OktechCPUReportPanel extends DialogWrapper {
     }
 
     static class ChartMouseListenter extends MouseAdapter {
+        private static SimpleDateFormat dateFormat = new SimpleDateFormat("HH:mm:ss.SSS");
         //private JTextArea jTextArea;
         private JTree jTree;
         private Map<Long, ThreadDataSummary> map;
+        private List<MemoryData> memoryDataList;
         private long minTime, maxTime;
 
-        ChartMouseListenter(JTree jTree, Map<Long, ThreadDataSummary> map, long minTime, long maxTime) {
+        ChartMouseListenter(JTree jTree, Map<Long, ThreadDataSummary> map, List<MemoryData> memoryDataList, long minTime, long maxTime) {
             this.jTree = jTree;
             this.map = map;
+            this.memoryDataList = memoryDataList;
             this.minTime = minTime;
             this.maxTime = maxTime;
         }
@@ -240,11 +242,31 @@ public class OktechCPUReportPanel extends DialogWrapper {
 
         }
 
+        private String getMemoryData(long time) {
+            int i = 0;
+            while ((i < memoryDataList.size()) && memoryDataList.get(i).getSystemTime() < time) {
+                i++;
+            }
+            if (i < memoryDataList.size()) {
+                MemoryData data = memoryDataList.get(i);
+                float usedHeap = data.getUsedHeap();
+                float usedNonHeap = data.getUsedNonHeap();
+
+                //convert to megabytes
+                usedHeap = usedHeap / 1024 / 1024;
+                usedNonHeap = usedNonHeap / 1024 /1024;
+                Formatter formatter = new Formatter();
+                return formatter.format("(usedHeap: %.2f Mb, usedNonHeap: %.2f Mb)", usedHeap, usedNonHeap).out().toString();
+            } else {
+                return null;
+            }
+        }
+
         private void updateTree(long time) {
             DefaultTreeModel treeModel = (DefaultTreeModel)jTree.getModel();
             DefaultMutableTreeNode treeRoot = new DefaultMutableTreeNode();
             Iterator<Map.Entry<Long, ThreadDataSummary>>  iter = map.entrySet().iterator();
-            treeRoot.setUserObject("stack traces for " + new Date(time) + "\n");
+            treeRoot.setUserObject("stack traces for " + dateFormat.format(new Date(time)) + " " + getMemoryData(time) + "\n");
             while (iter.hasNext()) {
                 ThreadDataSummary tds = iter.next().getValue();
                 StackTraceElement[] st = tds.getStackTrace(time);

@@ -61,7 +61,8 @@ public class ThreadChartComponent extends JComponent implements TimeIntervalAxis
     public void init() {
         int h = CELL_HEIGHT + 3;
         int chartHeight = h + threadsData.size() * CELL_HEIGHT + 5;
-        int chartWidth = (CELL_WIDTH * (int)((endTime - startTime)/1000 + 1));
+        float lengthPerMsec = (float)CELL_WIDTH / 1000;
+        int chartWidth = Math.round(lengthPerMsec * (endTime - startTime));
         if (chartWidth < 400) { // min space for Legend
             chartWidth = 400;
         }
@@ -73,10 +74,9 @@ public class ThreadChartComponent extends JComponent implements TimeIntervalAxis
         Iterator<Map.Entry<Long, ThreadDataSummary>> iter = threadsData.entrySet().iterator();
 
         int startX = NAME_LENGTH;
-        int totalLength = CELL_WIDTH * ((int)((endTime - startTime) / 1000 + 1));
-        int endX = NAME_LENGTH + totalLength;
+
         long totalTime = endTime - startTime;
-        float lengthPerMsec = ((float) totalLength) / totalTime;
+        int endX = startX;
 
         while (iter.hasNext()) {
             ThreadDataSummary tds = iter.next().getValue();
@@ -89,15 +89,18 @@ public class ThreadChartComponent extends JComponent implements TimeIntervalAxis
             if (data.length > 0) {
                 long time = data[0].getSystemTime();
                 x = startX + Math.round (((time - startTime) * lengthPerMsec));
+                g.setColor(Color.blue);
+                g.drawLine(x, h, x, h + CELL_HEIGHT);
                 for (int i = 1; i < data.length; i++) {
                     long newTime = data[i].getSystemTime();
-                    int newLength = Math.round ((newTime - time) * lengthPerMsec);
+                    int newLength = startX + Math.round ((newTime - startTime) * lengthPerMsec) - x;
                     Color c = getColorForState(data[i].getThreadState());
                     g.setColor(c);
                     g.fillRect(x, h, newLength, CELL_HEIGHT);
                     x+= newLength;
                     time = newTime;
                 }
+                if (x > endX) endX = x;
             }
 
             g.setColor(Color.BLACK);
@@ -107,7 +110,7 @@ public class ThreadChartComponent extends JComponent implements TimeIntervalAxis
 
         g.drawString("CPU Usage Time", NAME_LENGTH + chartWidth + 1, CELL_HEIGHT);
 
-        chartBounds = new Rectangle(startX, 0, totalLength, h - CELL_HEIGHT);
+        chartBounds = new Rectangle(startX, 0, endX - startX, h - CELL_HEIGHT);
     }
 
     private void drawLegend(Graphics g) {

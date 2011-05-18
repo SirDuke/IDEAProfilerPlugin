@@ -24,10 +24,8 @@
 
 package org.ssprofiler.idea.profileplugin.viewer.oktech;
 
-import com.intellij.util.containers.SortedList;
 import hu.oktech.profiler.core.data.ThreadData;
 
-import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedList;
 import java.util.List;
@@ -49,11 +47,8 @@ public class ThreadDataSummary {
             return null;
         }
         int i = 0;
-        while (datas.get(i).getSystemTime() < time) {
+        while ((i < datas.size()) && (datas.get(i).getSystemTime() < time)) {
             i++;
-            if (i == datas.size()) {
-                break;
-            }
         }
         if (i == datas.size()) {
             return null;

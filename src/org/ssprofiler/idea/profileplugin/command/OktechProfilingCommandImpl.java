@@ -54,7 +54,7 @@ public class OktechProfilingCommandImpl implements ProfilingCommand {
         Properties props = new Properties();
         props.setProperty("output.file", fileName);
         props.setProperty("thread.sampling.threadCpu", "true");
-        props.setProperty("sampling.millis", "1000");
+        props.setProperty("sampling.millis", "200");
         return props;
     }
 }

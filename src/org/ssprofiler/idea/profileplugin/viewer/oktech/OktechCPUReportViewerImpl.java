@@ -33,11 +33,10 @@ import hu.oktech.profiler.core.stream.StreamInput;
 import hu.oktech.profiler.core.stream.StreamProcessor;
 import org.ssprofiler.idea.profileplugin.viewer.CPUReportViewer;
 
-import javax.swing.*;
 import javax.xml.stream.XMLStreamException;
+import java.io.File;
 import java.io.IOException;
 import java.util.*;
-import java.util.List;
 
 /**
  * Created by IntelliJ IDEA.
@@ -130,7 +129,7 @@ public class OktechCPUReportViewerImpl implements CPUReportViewer {
 
 
     public static void main(String[] args) {
-        new OktechCPUReportViewerImpl().view("D:\\Users\\wpqb76\\cpu_184723_11472011.cpu");
+        new OktechCPUReportViewerImpl().view(System.getProperty("user.home") + File.separator + "cpu_184723_11472011.cpu");
 
 
         /*OktechCPUReportView view = new OktechCPUReportView(null, false);
