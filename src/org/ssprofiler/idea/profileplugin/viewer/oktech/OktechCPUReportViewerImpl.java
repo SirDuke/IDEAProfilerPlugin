@@ -34,9 +34,11 @@ import hu.oktech.profiler.core.stream.StreamProcessor;
 import org.ssprofiler.idea.profileplugin.viewer.CPUReportViewer;
 
 import javax.xml.stream.XMLStreamException;
+import java.awt.*;
 import java.io.File;
 import java.io.IOException;
 import java.util.*;
+import java.util.List;
 
 /**
  * Created by IntelliJ IDEA.
@@ -44,6 +46,10 @@ import java.util.*;
  * Date: 09.05.11
  */
 public class OktechCPUReportViewerImpl implements CPUReportViewer {
+    private static final int PREFERRED_WIDTH = 1000;
+    private static final int PREFERRED_HEIGHT = 600;
+    private static final Dimension PREFERRED_SIZE = new Dimension(PREFERRED_WIDTH, PREFERRED_HEIGHT);
+
     private long minTime=Long.MAX_VALUE, maxTime=0;
     private Map<Long, ThreadDataSummary> threadDataMap;
     private List<MemoryData> memoryDataList;
@@ -53,10 +59,12 @@ public class OktechCPUReportViewerImpl implements CPUReportViewer {
         readData(props);
 
         Tree samplingTree = null;
+        Tree samplingSummaryTree = null;
         try {
             TreeBuilder builder = new TreeBuilder();
             builder.process(props);
             samplingTree = builder.getSamplingTree();
+            samplingSummaryTree = builder.getSamplingSummary();
         } catch (XMLStreamException e) {
             e.printStackTrace();
         } catch (IOException e) {
@@ -65,15 +73,16 @@ public class OktechCPUReportViewerImpl implements CPUReportViewer {
 
 
         /*JFrame frame = new JFrame();
-        OktechCPUReportPanel cpuReportPanel = new OktechCPUReportPanel();
-        cpuReportPanel.init(threadDataMap, memoryDataList, samplingTree, minTime, maxTime);
-        frame.setContentPane(cpuReportPanel.getMainPanel());
-        frame.setSize(600, 600);
-        frame.setVisible(true);*/
-
         OktechCPUReportPanel cpuReportPanel = new OktechCPUReportPanel(false);
-        cpuReportPanel.init(threadDataMap, memoryDataList, samplingTree, minTime, maxTime);
-        cpuReportPanel.getPeer().setTitle("CPU Report");
+        cpuReportPanel.init(PREFERRED_SIZE, threadDataMap, memoryDataList, samplingTree, samplingSummaryTree,  minTime, maxTime);
+        frame.setContentPane(cpuReportPanel.getMainPanel());
+        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        frame.setSize(PREFERRED_SIZE);
+        frame.setVisible(true);*/
+        OktechCPUReportPanel cpuReportPanel = new OktechCPUReportPanel(false);
+        cpuReportPanel.setSize(PREFERRED_WIDTH, PREFERRED_HEIGHT);
+        cpuReportPanel.init(PREFERRED_SIZE, threadDataMap, memoryDataList, samplingTree, samplingSummaryTree,  minTime, maxTime);
+        cpuReportPanel.getPeer().setTitle("CPU Report " + filename);
         cpuReportPanel.show();
     }
 
@@ -129,93 +138,6 @@ public class OktechCPUReportViewerImpl implements CPUReportViewer {
 
 
     public static void main(String[] args) {
-        new OktechCPUReportViewerImpl().view(System.getProperty("user.home") + File.separator + "cpu_184723_11472011.cpu");
-
-
-        /*OktechCPUReportView view = new OktechCPUReportView(null, false);
-        view.getPeer().setTitle("CPU Report");
-        view.show();*/
-        /*JFrame frame = new JFrame();
-        frame.setLayout(new BorderLayout());
-        //frame.setLayout(new GridLayout(3,1));
-
-        OktechCPUReportViewerImpl ok = new OktechCPUReportViewerImpl();
-        Properties props = ok.createOktechBuilderProperties("D:\\Users\\wpqb76\\cpu_184723_11472011.cpu");
-
-        TreeBuilder builder = new TreeBuilder();
-        try {
-            builder.process(props);
-            final DefaultMutableTreeNode root = new DefaultMutableTreeNode(new StackTraceElementInfo("", 0, 0));
-            ok.buildSamplingTree(root, builder.getSamplingTree());
-            ColumnInfo treeColumn = new ColumnInfo("Sampling Tree") {
-                @Override
-                public Object valueOf(Object o) {
-                    StackTraceElementInfo stei = (StackTraceElementInfo) ((DefaultMutableTreeNode)o).getUserObject();
-                    return o;
-                }
-
-                @Override
-                public Class getColumnClass() {
-                    return TreeTableModel.class;
-                }
-            };
-            ColumnInfo countColumn = new ColumnInfo("Count") {
-
-                @Override
-                public Object valueOf(Object o) {
-                    StackTraceElementInfo stei = (StackTraceElementInfo) ((DefaultMutableTreeNode)o).getUserObject();
-                    return Long.toString(stei.getCount());
-                }
-            };
-            ColumnInfo cpuColumn = new ColumnInfo("CPU") {
-
-                @Override
-                public Object valueOf(Object o) {
-                    StackTraceElementInfo stei = (StackTraceElementInfo) ((DefaultMutableTreeNode)o).getUserObject();
-                    return Double.toString(stei.getCpuTime() / 1000000000);
-                }
-            };
-            //TreeTable treeTable = new TreeTable(new ListTreeTableModelOnColumns(root, new ColumnInfo[] {treeColumn, countColumn, cpuColumn}));
-
-            final ColumnInfo[] columns = new ColumnInfo[] {treeColumn, countColumn, cpuColumn};
-            TreeTableModel model = new ListTreeTableModel(root, columns);
-
-            final TreeTable treeTable = new TreeTable(model);
-            //JTree jTree = new com.intellij.ui.treeStructure.Tree(new DefaultTreeModel(root));
-            treeTable.setPreferredSize(new Dimension(600, 600));
-
-            frame.add(new JBScrollPane(treeTable));
-            frame.setSize(600, 600);
-            frame.setVisible(true);
-
-        } catch (IOException e) {
-            e.printStackTrace();  //To change body of catch statement use File | Settings | File Templates.
-        } catch (XMLStreamException e) {
-            e.printStackTrace();  //To change body of catch statement use File | Settings | File Templates.
-
-        }*/
-
-        /*ok.readData(props);
-        Map<Long, ThreadDataSummary> map = ok.threadDataMap;
-
-        ThreadChartComponent tcc = new ThreadChartComponent(map, ok.minTime, ok.maxTime);
-        frame.add(new JBScrollPane(tcc));
-
-        MemoryChartComponent mcc = new MemoryChartComponent(ok.memoryDataList);
-        frame.add(new JBScrollPane(mcc));
-
-        frame.setVisible(true);
-        tcc.init();
-        mcc.init();
-
-        //JTextArea jTextArea = new JTextArea();
-
-        JTree jTree = new com.intellij.ui.treeStructure.Tree(new DefaultTreeModel(new DefaultMutableTreeNode()));
-       // JTree jTree = new JTree(new DefaultTreeModel(new DefaultMutableTreeNode()));
-
-        tcc.addMouseListener(new ChartMouseListenter(jTree, map, ok.minTime, ok.maxTime));
-        frame.add(new JBScrollPane(jTree));*/
-
-
+        new OktechCPUReportViewerImpl().view(System.getProperty("user.home") + File.separator + "cpu_153845_25052011.cpu");
     }
 }

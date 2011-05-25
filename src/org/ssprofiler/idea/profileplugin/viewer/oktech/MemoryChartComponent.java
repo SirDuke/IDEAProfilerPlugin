@@ -47,9 +47,16 @@ public class MemoryChartComponent extends JComponent implements TimeIntervalAxis
     private List<MemoryData> memoryData;
     private Image bufferImage;
     private int startX, endX, selectedX=-1;
+    private int width, height;
 
     public MemoryChartComponent(List<MemoryData> memoryData) {
         this.memoryData = memoryData;
+        width = GAP_WEST + GAP_EAST + (int)(CELL_WIDTH * (memoryData.get(memoryData.size() - 1).getSystemTime() - memoryData.get(0).getSystemTime()) / 1000);
+        if (width < GAP_WEST + GAP_EAST + 400) { //leave space for legend
+            width = GAP_WEST + GAP_EAST + 400;
+        }
+        height = CHART_HEIGHT + GAP_NORTH + GAP_SOUTH;
+        setPreferredSize(new Dimension(width, height));
     }
 
     public void init() {
@@ -69,13 +76,8 @@ public class MemoryChartComponent extends JComponent implements TimeIntervalAxis
         int yUsedHeap = CHART_HEIGHT - Math.round(koef * data.getUsedHeap()) + GAP_NORTH;
         int yUsedNonHeap = CHART_HEIGHT - Math.round(koef * data.getUsedNonHeap()) + GAP_NORTH;
 
-        int width = GAP_WEST + GAP_EAST + (int)(CELL_WIDTH * (memoryData.get(memoryData.size() - 1).getSystemTime() - memoryData.get(0).getSystemTime()) / 1000);
-        if (width < GAP_WEST + GAP_EAST + 400) { //leave space for legend
-            width = GAP_WEST + GAP_EAST + 400;
-        }
-        int height = CHART_HEIGHT + GAP_NORTH + GAP_SOUTH;
+
         bufferImage = createImage(width, height);
-        setPreferredSize(new Dimension(width, height));
         Graphics g = bufferImage.getGraphics();
 
         Color colorUsedHeap = Color.red;

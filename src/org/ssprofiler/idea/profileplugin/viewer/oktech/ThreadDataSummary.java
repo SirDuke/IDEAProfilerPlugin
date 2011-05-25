@@ -78,7 +78,14 @@ public class ThreadDataSummary {
         return totalCpuTime;
     }
 
+    int kk = 0;
     public void add(ThreadData data) {
+        kk++;
+        if (kk != 5) {
+            //ignore 4 stackraces out of 5 to avoid OutOfMemory
+            return;
+        }
+        kk=0;
         if (datas.size() == 0) {
             datas.add(data);
         }  else {

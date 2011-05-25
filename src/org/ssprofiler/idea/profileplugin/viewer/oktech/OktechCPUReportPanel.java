@@ -39,6 +39,7 @@ import javax.swing.tree.DefaultTreeModel;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.text.DecimalFormat;
 import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.List;
@@ -49,8 +50,10 @@ import java.util.List;
  * Date: 14.05.11
  */
 public class OktechCPUReportPanel extends DialogWrapper {
+    private static final long NANO = 1000000000;
+
     private static String SAMPLING_TREE_COLUMN_HEADER = "Sampling Tree";
-    private static String SAMPLES_COLUMNT_HEADER = "Samples count";
+    private static String SAMPLES_COLUMN_HEADER = "Samples count";
     private static String CPU_COLUMN_HEADER = "CPU time usage";
 
     private JTabbedPane tabbedPane1;
@@ -58,10 +61,13 @@ public class OktechCPUReportPanel extends DialogWrapper {
     private JPanel panelCPUChart;
     private JPanel panelSamples;
     private JPanel panelMemory;
+    private JPanel panelSamplingSummary;
 
     private Map<Long, ThreadDataSummary> threadDataMap;
     private List<MemoryData> memoryDataList;
     private long minTime, maxTime;
+    private DecimalFormat doubleFormat = new DecimalFormat("##.##");
+    private Dimension preferredSize;
 
     protected OktechCPUReportPanel(boolean canBeParent) {
         super(canBeParent);
@@ -69,15 +75,23 @@ public class OktechCPUReportPanel extends DialogWrapper {
     }
 
 
-    public void init(Map<Long, ThreadDataSummary> threadDataMap, List<MemoryData> memoryDataList, Tree samplingTree, long minTime, long maxTime) {
+    public void init(Dimension preferredSize,
+                     Map<Long, ThreadDataSummary> threadDataMap,
+                     List<MemoryData> memoryDataList,
+                     Tree samplingTree,
+                     Tree samplingSummaryTree,
+                     long minTime,
+                     long maxTime) {
+        this.preferredSize = preferredSize;
         this.threadDataMap = threadDataMap;
         this.memoryDataList = memoryDataList;
         this.minTime = minTime;
         this.maxTime = maxTime;
-        panelMain.setPreferredSize(new Dimension(1000, 600));
+        panelMain.setPreferredSize(preferredSize);
         initCPUChartPanel();
         initMemoryChartPanel();
         initSampingTreePanel(samplingTree);
+        initSamplingSummaryTree(samplingSummaryTree);
     }
 
     public JPanel getMainPanel() {
@@ -85,6 +99,10 @@ public class OktechCPUReportPanel extends DialogWrapper {
     }
 
     private void initMemoryChartPanel() {
+        if (memoryDataList == null) {
+            panelMemory.add(new JLabel("No Data available"));
+            return;
+        }
         panelMemory.setLayout(new GridLayout(2, 1));
 
         MemoryChartComponent mmc = new MemoryChartComponent(memoryDataList);
@@ -97,6 +115,10 @@ public class OktechCPUReportPanel extends DialogWrapper {
     }
 
     private void initCPUChartPanel() {
+        if (threadDataMap == null) {
+            panelCPUChart.add(new JLabel("No Data available"));
+            return;
+        }
         panelCPUChart.setLayout(new GridLayout(2,1));
 
         ThreadChartComponent tcc = new ThreadChartComponent(threadDataMap, minTime, maxTime);
@@ -119,15 +141,21 @@ public class OktechCPUReportPanel extends DialogWrapper {
         TreeTableModel model = new ListTreeTableModelOnColumns(root, columns);
 
         final TreeTable treeTable = new TreeTable(model);
-        treeTable.getColumn(SAMPLES_COLUMNT_HEADER).setPreferredWidth(100);
-        treeTable.getColumn(SAMPLES_COLUMNT_HEADER).setMinWidth(30);
-        //treeTable.getColumn("Count").setMaxWidth(100);
-        treeTable.getColumn(CPU_COLUMN_HEADER).setPreferredWidth(100);
-        treeTable.getColumn(CPU_COLUMN_HEADER).setMinWidth(30);
-        //treeTable.getColumn("CPU").setMaxWidth(30);
-        treeTable.setPreferredSize(new Dimension(600, 600));
+
+        treeTable.setPreferredSize(preferredSize);
 
         panelSamples.add(new JBScrollPane(treeTable));
+    }
+
+    private void initSamplingSummaryTree(Tree samplingSummaryTree) {
+        if (samplingSummaryTree == null) {
+            panelSamplingSummary.add(new JLabel("No data available"));
+            return;
+        }
+
+        //panelSamplingSummary.add(new JBScrollPane(new MethodUsageTreeTable(samplingSummaryTree)));
+        ((SamplingSummaryPanel)panelSamplingSummary).init(samplingSummaryTree, preferredSize);
+
     }
 
     private ColumnInfo[] initSamplingTreeTableColumns() {
@@ -143,7 +171,7 @@ public class OktechCPUReportPanel extends DialogWrapper {
                 return TreeTableModel.class;
             }
         };
-        ColumnInfo countColumn = new ColumnInfo(SAMPLES_COLUMNT_HEADER) {
+        ColumnInfo countColumn = new ColumnInfo(SAMPLES_COLUMN_HEADER) {
 
             @Override
             public Object valueOf(Object o) {
@@ -156,7 +184,7 @@ public class OktechCPUReportPanel extends DialogWrapper {
             @Override
             public Object valueOf(Object o) {
                 StackTraceElementInfo stei = (StackTraceElementInfo) ((DefaultMutableTreeNode) o).getUserObject();
-                return Double.toString(stei.getCpuTime() / 1000000000);
+                return Double.toString(stei.getCpuTime() / NANO);
             }
         };
 
@@ -177,7 +205,46 @@ public class OktechCPUReportPanel extends DialogWrapper {
         }
     }
 
-    @Override
+    private void buildSamplingSummaryTree(DefaultMutableTreeNode uiTree, Tree samplingSummaryTree, int level) {
+        Map<String, Tree> subTrees = samplingSummaryTree.getSubTrees();
+        if (subTrees != null) {
+            for (Iterator<Map.Entry<String, Tree>> iterator = subTrees.entrySet().iterator(); iterator.hasNext();) {
+                Map.Entry<String, Tree> entry = iterator.next();
+                Tree tree = entry.getValue();
+                DefaultMutableTreeNode newNode = new DefaultMutableTreeNode(new TreeWrapper(tree));
+                uiTree.add(newNode);
+                buildSamplingSummaryTree(newNode, entry.getValue(), level+1);
+            }
+        }
+    }
+
+    private void createUIComponents() {
+        panelSamplingSummary = new SamplingSummaryPanel();
+    }
+
+    private class TreeWrapper {
+        private Tree tree;
+
+        private TreeWrapper(Tree tree) {
+            this.tree = tree;
+        }
+
+        @Override
+        public String toString() {
+            return tree.getTreeKey();
+        }
+
+        public String getCpuTime() {
+            return doubleFormat.format(tree.getCpuTotal() / NANO);
+        }
+
+        public String getSystemTime() {
+            return doubleFormat.format(tree.getSystemTotal() / NANO);
+        }
+    }
+
+
+  //  @Override
     protected JComponent createCenterPanel() {
         return panelMain;
     }
