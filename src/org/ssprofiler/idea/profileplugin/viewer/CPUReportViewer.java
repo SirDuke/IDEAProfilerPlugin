@@ -24,11 +24,13 @@
 
 package org.ssprofiler.idea.profileplugin.viewer;
 
+import java.io.IOException;
+
 /**
  * Created by IntelliJ IDEA.
  * User: Ivan Serduk
  * Date: 09.05.11
  */
 public interface CPUReportViewer {
-    public void view(String filename);
+    public void view(String filename) throws IOException;
 }

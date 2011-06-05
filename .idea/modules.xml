@@ -3,6 +3,7 @@
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/IDEAProfilerPlugin.iml" filepath="$PROJECT_DIR$/IDEAProfilerPlugin.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../oktech/Oktech.iml" filepath="$PROJECT_DIR$/../oktech/Oktech.iml" />
     </modules>
   </component>
 </project>

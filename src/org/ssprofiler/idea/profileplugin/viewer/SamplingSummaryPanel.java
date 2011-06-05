@@ -1,4 +1,4 @@
-package org.ssprofiler.idea.profileplugin.viewer.oktech;
+package org.ssprofiler.idea.profileplugin.viewer;
 
 import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.table.JBTable;
@@ -6,7 +6,9 @@ import com.intellij.ui.treeStructure.treetable.ListTreeTableModel;
 import com.intellij.ui.treeStructure.treetable.TreeTable;
 import com.intellij.ui.treeStructure.treetable.TreeTableModel;
 import com.intellij.util.ui.ColumnInfo;
-import hu.oktech.profiler.analyzer.tree.Tree;
+import org.ssprofiler.model.MethodSummary;
+import org.ssprofiler.model.StackTraceTree;
+import org.ssprofiler.model.ThreadDump;
 
 import javax.swing.*;
 import javax.swing.event.ListSelectionEvent;
@@ -18,7 +20,8 @@ import javax.swing.table.TableColumnModel;
 import javax.swing.tree.DefaultMutableTreeNode;
 import java.awt.*;
 import java.text.DecimalFormat;
-import java.util.*;
+import java.util.Collection;
+import java.util.Iterator;
 import java.util.List;
 
 /**
@@ -31,7 +34,7 @@ public class SamplingSummaryPanel extends JPanel {
     private static final int NANO = 1000000000;
     private static final DecimalFormat doubleFormat = new DecimalFormat("#.###");
 
-    private List<Tree> methodsList;
+    private List<MethodSummary> methodSummaries;
     private JTable tableMethods;
     private TreeTable treeTableMethodUsages;
     private MethodUsageTreeNode root;
@@ -39,9 +42,8 @@ public class SamplingSummaryPanel extends JPanel {
     public SamplingSummaryPanel() {
     }
 
-    void init(Tree samplingSummaryTree, Dimension preferredSize) {
-        methodsList = new ArrayList<Tree>();
-        methodsList.addAll(samplingSummaryTree.getSubTrees().values());
+    void init(final List<MethodSummary> methodSummaries, final Collection<ThreadDump> threadDumps,  Dimension preferredSize) {
+        this.methodSummaries = methodSummaries;
 
         setPreferredSize(preferredSize);
         setLayout(new GridLayout(2,1));
@@ -65,15 +67,11 @@ public class SamplingSummaryPanel extends JPanel {
                 int selectedIndex = tableMethods.getSelectedRow();
                 if (selectedIndex != -1) {
                     int modelSelectedIndex = tableMethods.getRowSorter().convertRowIndexToModel(selectedIndex);
-                    Tree tree = methodsList.get(modelSelectedIndex);
+                    MethodSummary methodSummary = methodSummaries.get(modelSelectedIndex);
+                    StackTraceTree tree = methodSummary.getCallers(threadDumps);
                     root.removeAllChildren();
                     root.setTree(tree);
-                    DefaultMutableTreeNode node = new MethodUsageTreeNode("Parents:");
-                    root.add(node);
-                    updateTreeMethodUsages(tree.getParentTrees(), node);
-                    node = new MethodUsageTreeNode("Calees:");
-                    root.add(node);
-                    updateTreeMethodUsages(tree.getSubTrees(), node);
+                    updateTreeMethodUsages(tree.getChildren(), root);
                     treeTablemodel.nodeStructureChanged(root);
 
                 }
@@ -84,14 +82,13 @@ public class SamplingSummaryPanel extends JPanel {
         add(new JBScrollPane(treeTableMethodUsages));
     }
 
-    private void updateTreeMethodUsages(Map<String,Tree> subTrees, DefaultMutableTreeNode curRoot) {
+    private void updateTreeMethodUsages(Collection<StackTraceTree> subTrees, DefaultMutableTreeNode curRoot) {
         if (subTrees != null) {
-            Collection<Tree> trees = subTrees.values();
-            for (Iterator<Tree> iterator = trees.iterator(); iterator.hasNext();) {
-                Tree tree = iterator.next();
+            for (Iterator<StackTraceTree> iterator = subTrees.iterator(); iterator.hasNext();) {
+                StackTraceTree tree = iterator.next();
                 DefaultMutableTreeNode node = new MethodUsageTreeNode(tree);
                 curRoot.add(node);
-                updateTreeMethodUsages(tree.getSubTrees(), node);
+                updateTreeMethodUsages(tree.getChildren(), node);
             }
         }
     }
@@ -184,7 +181,7 @@ public class SamplingSummaryPanel extends JPanel {
 
     class MethodsInfoTableModel extends AbstractTableModel {
         public int getRowCount() {
-            return methodsList.size();
+            return methodSummaries.size();
         }
 
         public int getColumnCount() {
@@ -192,14 +189,14 @@ public class SamplingSummaryPanel extends JPanel {
         }
 
         public Object getValueAt(int rowIndex, int columnIndex) {
-            Tree tree = methodsList.get(rowIndex);
+            MethodSummary methodSummary = methodSummaries.get(rowIndex);
             switch (columnIndex) {
-                case 0: return tree.getTreeKey();
-                case 1: return tree.getCounter();
-                case 2: return tree.getCpuTotal() / NANO;
-                case 3: return tree.getCpuReal() / NANO;
-                case 4: return tree.getSystemTotal() / NANO;
-                case 5: return tree.getSystemReal() / NANO;
+                case 0: return methodSummary.getMethodName();
+                case 1: return methodSummary.getCount();
+                case 2: return (double) methodSummary.getCpuTimeTotal() / NANO;
+                case 3: return (double) methodSummary.getCpuTimeOwn() / NANO;
+                case 4: return (double) methodSummary.getSystemTimeTotal() / NANO;
+                case 5: return (double) methodSummary.getSystemTimeOwn() / NANO;
 
             }
             return -1;
@@ -232,40 +229,40 @@ public class SamplingSummaryPanel extends JPanel {
     }
 
     class MethodUsageTreeNode extends DefaultMutableTreeNode {
-        private Tree tree;
+        private StackTraceTree tree;
 
-        MethodUsageTreeNode(Tree tree) {
+        MethodUsageTreeNode(StackTraceTree tree) {
             this.tree = tree;
-            setUserObject(tree.getTreeKey());
+            setUserObject(tree.getMethodName());
         }
 
         MethodUsageTreeNode(String s) {
             setUserObject(s);
         }
 
-        void setTree(Tree tree) {
+        void setTree(StackTraceTree tree) {
             this.tree = tree;
-            setUserObject(tree.getTreeKey());
+            setUserObject(tree.getMethodName());
         }
 
-        Long getCounter() {
-            return (tree != null) ? tree.getCounter() : null;
+        Integer getCounter() {
+            return (tree != null) ? tree.getCount() : null;
         }
 
         Double getCpuTotal() {
-            return (tree != null) ? tree.getCpuTotal() / NANO : null;
+            return (tree != null) ? (double)tree.getCpuTimeTotal() / NANO : null;
         }
 
         Double getCpuReal() {
-            return (tree != null) ? tree.getCpuReal() / NANO : null;
+            return (tree != null) ? (double)tree.getCpuTimeOwn() / NANO : null;
         }
 
         Double getSystemTotal() {
-            return (tree != null) ? tree.getSystemTotal() / NANO : null;
+            return (tree != null) ? (double)tree.getSystemTimeTotal() / NANO : null;
         }
 
         Double getSystemReal() {
-            return (tree != null) ? tree.getSystemReal() / NANO : null;
+            return (tree != null) ? (double)tree.getSystemTimeOwn() / NANO : null;
         }
     }
 }

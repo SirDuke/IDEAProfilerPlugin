@@ -22,14 +22,15 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.ssprofiler.idea.profileplugin.viewer.oktech;
+package org.ssprofiler.idea.profileplugin.viewer;
 
-import hu.oktech.profiler.core.data.ThreadData;
+import org.ssprofiler.model.ThreadDump;
+import org.ssprofiler.model.TimeInterval;
 
 import javax.swing.*;
 import java.awt.*;
+import java.util.Collection;
 import java.util.Iterator;
-import java.util.Map;
 
 /**
  * Created by IntelliJ IDEA.
@@ -37,80 +38,75 @@ import java.util.Map;
  * Date: 11.05.11
  */
 public class ThreadChartComponent extends JComponent implements TimeIntervalAxis{
-    private final int CELL_HEIGHT = 12;
-    private final int CELL_WIDTH = 12;
-    private final int NAME_LENGTH = 300;
+    private final long NANO = 1000000000;
 
-    private Map<Long, ThreadDataSummary> threadsData;
+    private static final int CELL_HEIGHT = 12;
+    private static final int CELL_WIDTH = 12;
+    private static final int NAME_LENGTH = 300;
+    private static final int CPU_TIME_LENGTH = 50;
+    private static final int GAP_SOUTH = 3;
+    private static final int MIN_LEGEND_LENGTH = 400;
+
+    private Collection<ThreadDump> threadsDumps;
     private long startTime, endTime;
     private Image offscreen;
     private Rectangle chartBounds;
+    private Dimension totalSize;
     private int selectedX = -1;
 
-    public ThreadChartComponent(Map<Long, ThreadDataSummary> threadsData, long startTime, long endTime) {
-        this.threadsData = threadsData;
+    public ThreadChartComponent(Collection<ThreadDump> threadsDumps, long startTime, long endTime) {
+        this.threadsDumps = threadsDumps;
         this.startTime = startTime;
         this.endTime = endTime;
 
-        int chartHeight = 2*CELL_HEIGHT + threadsData.size() * CELL_HEIGHT;
-        int chartWidth = NAME_LENGTH + (CELL_WIDTH * (int)((endTime - startTime)/1000)) + 500;
-        setPreferredSize(new Dimension(chartWidth, chartHeight));
-        setSize(chartWidth, chartHeight);
+        int h = CELL_HEIGHT + 3;
+        int chartHeight = threadsDumps.size() * CELL_HEIGHT;
+        int chartWidth = Math.round((endTime - startTime) * CELL_WIDTH / NANO);
+        if (chartWidth < MIN_LEGEND_LENGTH) { // min space for Legend
+            chartWidth = MIN_LEGEND_LENGTH;
+        }
+        chartBounds = new Rectangle(NAME_LENGTH, h, chartWidth, chartHeight);
+
+        totalSize = new Dimension(NAME_LENGTH + chartWidth + CPU_TIME_LENGTH, h + chartHeight + GAP_SOUTH);
+        setPreferredSize(totalSize);
     }
 
     public void init() {
-        int h = CELL_HEIGHT + 3;
-        int chartHeight = h + threadsData.size() * CELL_HEIGHT + 5;
-        float lengthPerMsec = (float)CELL_WIDTH / 1000;
-        int chartWidth = Math.round(lengthPerMsec * (endTime - startTime));
-        if (chartWidth < 400) { // min space for Legend
-            chartWidth = 400;
-        }
-        int imageWidth = NAME_LENGTH + chartWidth + 100;
-        offscreen = createImage(imageWidth, chartHeight);
-        //offscreen = new BufferedImage(chartWidth, chartHeight, BufferedImage.TYPE_INT_RGB);
+        float lengthPerNanosec = (float)CELL_WIDTH / NANO;
+        offscreen = createImage(totalSize.width, totalSize.height + GAP_SOUTH);
         Graphics g = offscreen.getGraphics();
         drawLegend(g);
-        Iterator<Map.Entry<Long, ThreadDataSummary>> iter = threadsData.entrySet().iterator();
+        Iterator<ThreadDump> iter = threadsDumps.iterator();
 
         int startX = NAME_LENGTH;
-
-        long totalTime = endTime - startTime;
-        int endX = startX;
+        int h = CELL_HEIGHT + 3;
+        Thread.State[] THREAD_STATE = Thread.State.values();
 
         while (iter.hasNext()) {
-            ThreadDataSummary tds = iter.next().getValue();
+            ThreadDump threadDump = iter.next();
             g.setColor(Color.BLACK);
-            g.drawString(tds.getThreadName(), 0, h+CELL_HEIGHT);
+            g.drawString(threadDump.getName(), 0, h+CELL_HEIGHT);
 
-
-            ThreadData[] data = tds.getThreadData();
-            int x = 0;
-            if (data.length > 0) {
-                long time = data[0].getSystemTime();
-                x = startX + Math.round (((time - startTime) * lengthPerMsec));
-                g.setColor(Color.blue);
-                g.drawLine(x, h, x, h + CELL_HEIGHT);
-                for (int i = 1; i < data.length; i++) {
-                    long newTime = data[i].getSystemTime();
-                    int newLength = startX + Math.round ((newTime - startTime) * lengthPerMsec) - x;
-                    Color c = getColorForState(data[i].getThreadState());
-                    g.setColor(c);
-                    g.fillRect(x, h, newLength, CELL_HEIGHT);
-                    x+= newLength;
-                    time = newTime;
+            for (int i = 0; i < THREAD_STATE.length; i++) {
+                java.util.List<TimeInterval> intervals = threadDump.getTimeIntevalsForState(THREAD_STATE[i]);
+                if (!intervals.isEmpty()) {
+                    Color color = getColorForState(THREAD_STATE[i]);
+                    g.setColor(color);
+                    for (Iterator<TimeInterval> iterator = intervals.iterator(); iterator.hasNext();) {
+                        TimeInterval interval = iterator.next();
+                        int x0 = startX + Math.round((interval.getStartTime() - startTime) * lengthPerNanosec);
+                        int x1 = startX + Math.round((interval.getEndTime() - startTime) * lengthPerNanosec);
+                        g.fillRect(x0, h, x1 - x0, CELL_HEIGHT);
+                    }
                 }
-                if (x > endX) endX = x;
             }
 
             g.setColor(Color.BLACK);
-            g.drawString(Float.toString(((float)tds.getTotalCpuTime())/1000000000), NAME_LENGTH + chartWidth + 1 , h+CELL_HEIGHT);
+            g.drawString(Long.toString(threadDump.getStackTraceTree().getCpuTimeTotal()), NAME_LENGTH + chartBounds.width + 1 , h+CELL_HEIGHT);
             h += CELL_HEIGHT;
         }
 
-        g.drawString("CPU Usage Time", NAME_LENGTH + chartWidth + 1, CELL_HEIGHT);
-
-        chartBounds = new Rectangle(startX, 0, endX - startX, h - CELL_HEIGHT);
+        g.drawString("CPU Usage Time", NAME_LENGTH + chartBounds.width + 1, CELL_HEIGHT);
     }
 
     private void drawLegend(Graphics g) {
@@ -168,7 +164,7 @@ public class ThreadChartComponent extends JComponent implements TimeIntervalAxis
         g.drawImage(offscreen, 0, 0, null);
         if (selectedX != -1) {
             g.setColor(Color.BLACK);
-            g.drawLine(selectedX, CELL_HEIGHT + 3, selectedX, chartBounds.y + chartBounds.height);
+            g.drawLine(selectedX, chartBounds.y, selectedX, chartBounds.y + chartBounds.height);
         }
     }
 

@@ -22,7 +22,7 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.ssprofiler.idea.profileplugin.viewer.oktech;
+package org.ssprofiler.idea.profileplugin.viewer;
 
 import com.intellij.openapi.ui.DialogWrapper;
 import com.intellij.ui.components.JBScrollPane;
@@ -30,8 +30,10 @@ import com.intellij.ui.treeStructure.treetable.ListTreeTableModelOnColumns;
 import com.intellij.ui.treeStructure.treetable.TreeTable;
 import com.intellij.ui.treeStructure.treetable.TreeTableModel;
 import com.intellij.util.ui.ColumnInfo;
-import hu.oktech.profiler.analyzer.tree.Tree;
-import hu.oktech.profiler.core.data.MemoryData;
+import org.ssprofiler.model.MemoryInfo;
+import org.ssprofiler.model.MethodSummary;
+import org.ssprofiler.model.StackTraceTree;
+import org.ssprofiler.model.ThreadDump;
 
 import javax.swing.*;
 import javax.swing.tree.DefaultMutableTreeNode;
@@ -41,15 +43,17 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.text.DecimalFormat;
 import java.text.SimpleDateFormat;
-import java.util.*;
+import java.util.Collection;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Created by IntelliJ IDEA.
  * User: Ivan Serduk
  * Date: 14.05.11
  */
-public class OktechCPUReportPanel extends DialogWrapper {
+public class CPUReportPanel extends DialogWrapper {
     private static final long NANO = 1000000000;
 
     private static String SAMPLING_TREE_COLUMN_HEADER = "Sampling Tree";
@@ -63,35 +67,34 @@ public class OktechCPUReportPanel extends DialogWrapper {
     private JPanel panelMemory;
     private JPanel panelSamplingSummary;
 
-    private Map<Long, ThreadDataSummary> threadDataMap;
-    private List<MemoryData> memoryDataList;
+    private Map<Long, ThreadDump> threadDumps;
+    private List<MemoryInfo> memoryDataList;
     private long minTime, maxTime;
     private DecimalFormat doubleFormat = new DecimalFormat("##.##");
     private Dimension preferredSize;
 
-    protected OktechCPUReportPanel(boolean canBeParent) {
+    protected CPUReportPanel(boolean canBeParent) {
         super(canBeParent);
         init();
     }
 
 
     public void init(Dimension preferredSize,
-                     Map<Long, ThreadDataSummary> threadDataMap,
-                     List<MemoryData> memoryDataList,
-                     Tree samplingTree,
-                     Tree samplingSummaryTree,
+                     Map<Long, ThreadDump> threadDumps,
+                     List<MemoryInfo> memoryDataList,
+                     List<MethodSummary> methodSummaries,
                      long minTime,
                      long maxTime) {
         this.preferredSize = preferredSize;
-        this.threadDataMap = threadDataMap;
+        this.threadDumps = threadDumps;
         this.memoryDataList = memoryDataList;
         this.minTime = minTime;
         this.maxTime = maxTime;
         panelMain.setPreferredSize(preferredSize);
         initCPUChartPanel();
         initMemoryChartPanel();
-        initSampingTreePanel(samplingTree);
-        initSamplingSummaryTree(samplingSummaryTree);
+        initSampingTreePanel(threadDumps.values());
+        initSamplingSummaryTree(threadDumps.values(), methodSummaries);
     }
 
     public JPanel getMainPanel() {
@@ -109,52 +112,72 @@ public class OktechCPUReportPanel extends DialogWrapper {
         panelMemory.add(new JBScrollPane(mmc));
 
         JTree jTree = new com.intellij.ui.treeStructure.Tree(new DefaultTreeModel(new DefaultMutableTreeNode("Select time at the chart above to view stacktraces")));
+        initTree(jTree);
         panelMemory.add(new JBScrollPane(jTree));
 
-        mmc.addMouseListener(new ChartMouseListenter(jTree, threadDataMap, memoryDataList, minTime, maxTime));
+        mmc.addMouseListener(new ChartMouseListenter(jTree, threadDumps.values(), minTime, maxTime));
     }
 
     private void initCPUChartPanel() {
-        if (threadDataMap == null) {
+        if (threadDumps == null) {
             panelCPUChart.add(new JLabel("No Data available"));
             return;
         }
         panelCPUChart.setLayout(new GridLayout(2,1));
 
-        ThreadChartComponent tcc = new ThreadChartComponent(threadDataMap, minTime, maxTime);
+        ThreadChartComponent tcc = new ThreadChartComponent(threadDumps.values(), minTime, maxTime);
         panelCPUChart.add(new JBScrollPane(tcc));
 
         JTree jTree = new com.intellij.ui.treeStructure.Tree(new DefaultTreeModel(new DefaultMutableTreeNode("Select time at the chart above to view stacktraces")));
+        initTree(jTree);
         panelCPUChart.add(new JBScrollPane(jTree));
 
-        tcc.addMouseListener(new ChartMouseListenter(jTree, threadDataMap, memoryDataList, minTime, maxTime));
+        tcc.addMouseListener(new ChartMouseListenter(jTree, threadDumps.values(), minTime, maxTime));
     }
 
-    private void initSampingTreePanel(Tree samplingTree) {
-        if (samplingTree == null) {
+    private void initTree(JTree jTree) {
+        DefaultTreeModel treeModel = (DefaultTreeModel) jTree.getModel();
+        DefaultMutableTreeNode root = new DefaultMutableTreeNode();
+        Iterator<ThreadDump> iter = threadDumps.values().iterator();
+        while (iter.hasNext()) {
+            ThreadDump dump = iter.next();
+            DefaultMutableTreeNode newNode = new DefaultMutableTreeNode(new ThreadDumpNode(dump));
+            root.add(newNode);
+        }
+        treeModel.setRoot(root);
+    }
+
+    private void initSampingTreePanel(Collection<ThreadDump> threadDumps) {
+        if (threadDumps == null) {
             panelSamples.add(new JLabel("No data available"));
             return;
         }
-        final DefaultMutableTreeNode root = new DefaultMutableTreeNode(new StackTraceElementInfo("", 0, 0));
-        buildSamplingTree(root, samplingTree);
+        final DefaultMutableTreeNode root = new DefaultMutableTreeNode(new StackTraceTree("", 0));
+        for (Iterator<ThreadDump> iterator = threadDumps.iterator(); iterator.hasNext();) {
+            ThreadDump threadDump = iterator.next();
+            DefaultMutableTreeNode newNode = new DefaultMutableTreeNode(threadDump.getStackTraceTree());
+            root.add(newNode);
+            buildSamplingTree(newNode, threadDump.getStackTraceTree().getChildren());
+
+        }
         final ColumnInfo[] columns = initSamplingTreeTableColumns();
         TreeTableModel model = new ListTreeTableModelOnColumns(root, columns);
 
         final TreeTable treeTable = new TreeTable(model);
 
-        treeTable.setPreferredSize(preferredSize);
+       // treeTable.setPreferredSize(preferredSize);
 
         panelSamples.add(new JBScrollPane(treeTable));
     }
 
-    private void initSamplingSummaryTree(Tree samplingSummaryTree) {
-        if (samplingSummaryTree == null) {
+    private void initSamplingSummaryTree(Collection<ThreadDump> threadDumps, List<MethodSummary> methodSummaries) {
+        if (methodSummaries == null) {
             panelSamplingSummary.add(new JLabel("No data available"));
             return;
         }
 
         //panelSamplingSummary.add(new JBScrollPane(new MethodUsageTreeTable(samplingSummaryTree)));
-        ((SamplingSummaryPanel)panelSamplingSummary).init(samplingSummaryTree, preferredSize);
+        ((SamplingSummaryPanel)panelSamplingSummary).init(methodSummaries, threadDumps, preferredSize);
 
     }
 
@@ -162,8 +185,7 @@ public class OktechCPUReportPanel extends DialogWrapper {
         ColumnInfo treeColumn = new ColumnInfo(SAMPLING_TREE_COLUMN_HEADER) {
             @Override
             public Object valueOf(Object o) {
-                StackTraceElementInfo stei = (StackTraceElementInfo) ((DefaultMutableTreeNode) o).getUserObject();
-                return stei.getName();
+                return ((DefaultMutableTreeNode) o).getUserObject();
             }
 
             @Override
@@ -175,7 +197,7 @@ public class OktechCPUReportPanel extends DialogWrapper {
 
             @Override
             public Object valueOf(Object o) {
-                StackTraceElementInfo stei = (StackTraceElementInfo) ((DefaultMutableTreeNode) o).getUserObject();
+                StackTraceTree stei = (StackTraceTree) ((DefaultMutableTreeNode) o).getUserObject();
                 return Long.toString(stei.getCount());
             }
         };
@@ -183,64 +205,26 @@ public class OktechCPUReportPanel extends DialogWrapper {
 
             @Override
             public Object valueOf(Object o) {
-                StackTraceElementInfo stei = (StackTraceElementInfo) ((DefaultMutableTreeNode) o).getUserObject();
-                return Double.toString(stei.getCpuTime() / NANO);
+                StackTraceTree stei = (StackTraceTree) ((DefaultMutableTreeNode) o).getUserObject();
+                return Double.toString(stei.getCpuTimeTotal() / NANO);
             }
         };
 
         return new ColumnInfo[]{treeColumn, countColumn, cpuColumn};
     }
 
-    private void buildSamplingTree(DefaultMutableTreeNode uiTree, Tree samplingTree) {
-        Map<String, Tree> subTrees = samplingTree.getSubTrees();
-        if (subTrees != null) {
-            for (Iterator<Map.Entry<String, Tree>> iterator = subTrees.entrySet().iterator(); iterator.hasNext();) {
-                Map.Entry<String, Tree> entry = iterator.next();
-                Tree tree = entry.getValue();
-                StackTraceElementInfo stei = new StackTraceElementInfo(entry.getKey(), tree.getCounter(), tree.getCpuTotal());
-                DefaultMutableTreeNode newNode = new DefaultMutableTreeNode(stei);
-                uiTree.add(newNode);
-                buildSamplingTree(newNode, entry.getValue());
-            }
-        }
-    }
+    private void buildSamplingTree(DefaultMutableTreeNode treeNode, Collection<StackTraceTree> children) {
+        for (Iterator<StackTraceTree> iterator = children.iterator(); iterator.hasNext();) {
+            StackTraceTree subtree = iterator.next();
+            DefaultMutableTreeNode newNode = new DefaultMutableTreeNode(subtree);
+            treeNode.add(newNode);
+            buildSamplingTree(newNode, subtree.getChildren());
 
-    private void buildSamplingSummaryTree(DefaultMutableTreeNode uiTree, Tree samplingSummaryTree, int level) {
-        Map<String, Tree> subTrees = samplingSummaryTree.getSubTrees();
-        if (subTrees != null) {
-            for (Iterator<Map.Entry<String, Tree>> iterator = subTrees.entrySet().iterator(); iterator.hasNext();) {
-                Map.Entry<String, Tree> entry = iterator.next();
-                Tree tree = entry.getValue();
-                DefaultMutableTreeNode newNode = new DefaultMutableTreeNode(new TreeWrapper(tree));
-                uiTree.add(newNode);
-                buildSamplingSummaryTree(newNode, entry.getValue(), level+1);
-            }
         }
     }
 
     private void createUIComponents() {
         panelSamplingSummary = new SamplingSummaryPanel();
-    }
-
-    private class TreeWrapper {
-        private Tree tree;
-
-        private TreeWrapper(Tree tree) {
-            this.tree = tree;
-        }
-
-        @Override
-        public String toString() {
-            return tree.getTreeKey();
-        }
-
-        public String getCpuTime() {
-            return doubleFormat.format(tree.getCpuTotal() / NANO);
-        }
-
-        public String getSystemTime() {
-            return doubleFormat.format(tree.getSystemTotal() / NANO);
-        }
     }
 
 
@@ -249,47 +233,16 @@ public class OktechCPUReportPanel extends DialogWrapper {
         return panelMain;
     }
 
-    static class StackTraceElementInfo {
-        private String name;
-        private long count;
-        private double cpuTime;
-
-        public StackTraceElementInfo(String name, long count, double cpuTime) {
-            this.name = name;
-            this.count = count;
-            this.cpuTime = cpuTime;
-        }
-
-        public String getName() {
-            return name;
-        }
-
-        public long getCount() {
-            return count;
-        }
-
-        public double getCpuTime() {
-            return cpuTime;
-        }
-
-        @Override
-        public String toString() {
-            return name;
-        }
-    }
-
     static class ChartMouseListenter extends MouseAdapter {
         private static SimpleDateFormat dateFormat = new SimpleDateFormat("HH:mm:ss.SSS");
         //private JTextArea jTextArea;
         private JTree jTree;
-        private Map<Long, ThreadDataSummary> map;
-        private List<MemoryData> memoryDataList;
+        private Collection<ThreadDump> threadDumps;
         private long minTime, maxTime;
 
-        ChartMouseListenter(JTree jTree, Map<Long, ThreadDataSummary> map, List<MemoryData> memoryDataList, long minTime, long maxTime) {
+        ChartMouseListenter(JTree jTree, Collection<ThreadDump> threadDumps, long minTime, long maxTime) {
             this.jTree = jTree;
-            this.map = map;
-            this.memoryDataList = memoryDataList;
+            this.threadDumps = threadDumps;
             this.minTime = minTime;
             this.maxTime = maxTime;
         }
@@ -309,44 +262,61 @@ public class OktechCPUReportPanel extends DialogWrapper {
 
         }
 
-        private String getMemoryData(long time) {
-            int i = 0;
-            while ((i < memoryDataList.size()) && memoryDataList.get(i).getSystemTime() < time) {
-                i++;
-            }
-            if (i < memoryDataList.size()) {
-                MemoryData data = memoryDataList.get(i);
-                float usedHeap = data.getUsedHeap();
-                float usedNonHeap = data.getUsedNonHeap();
-
-                //convert to megabytes
-                usedHeap = usedHeap / 1024 / 1024;
-                usedNonHeap = usedNonHeap / 1024 /1024;
-                Formatter formatter = new Formatter();
-                return formatter.format("(usedHeap: %.2f Mb, usedNonHeap: %.2f Mb)", usedHeap, usedNonHeap).out().toString();
-            } else {
-                return null;
-            }
-        }
-
+        // time in nanoseconds
         private void updateTree(long time) {
             DefaultTreeModel treeModel = (DefaultTreeModel)jTree.getModel();
-            DefaultMutableTreeNode treeRoot = new DefaultMutableTreeNode();
-            Iterator<Map.Entry<Long, ThreadDataSummary>>  iter = map.entrySet().iterator();
-            treeRoot.setUserObject("stack traces for " + dateFormat.format(new Date(time)) + " " + getMemoryData(time) + "\n");
-            while (iter.hasNext()) {
-                ThreadDataSummary tds = iter.next().getValue();
-                StackTraceElement[] st = tds.getStackTrace(time);
-                if (st != null) {
-                    DefaultMutableTreeNode threadNode = new DefaultMutableTreeNode(tds.getThreadName() + "  " + tds.getStatus(time));
-                    for (int i = 0; i < st.length; i++) {
-                        DefaultMutableTreeNode stackTraceNode = new DefaultMutableTreeNode(st[i]);
-                        threadNode.add(stackTraceNode);
+            DefaultMutableTreeNode treeRoot = (DefaultMutableTreeNode) treeModel.getRoot();
+            int n = threadDumps.size();
+            for (int i = 0; i < n; i++) {
+                DefaultMutableTreeNode child = (DefaultMutableTreeNode) treeRoot.getChildAt(i);
+                ThreadDumpNode threadDumpNode = (ThreadDumpNode) child.getUserObject();
+                threadDumpNode.updateStatus(time);
+                ThreadDump threadDump = threadDumpNode.getThreadDump();
+                child.removeAllChildren();
+                if ((threadDump.getFirstDumpSystemTime() < time) && (threadDump.getLastDumpSystemTime() >= time)) {
+                    String[] stack = threadDump.getStackTrace(time);
+                    Thread.State state = threadDump.getThreadState(time);
+                    for (int j = 0; j < stack.length; j++) {
+                        DefaultMutableTreeNode stackTraceNode = new DefaultMutableTreeNode(stack[j]);
+                        child.add(stackTraceNode);
                     }
-                    treeRoot.add(threadNode);
                 }
+                treeModel.nodeChanged(child);
+                treeModel.nodeStructureChanged(child);
             }
-            treeModel.setRoot(treeRoot);
+         //   treeModel.nodeStructureChanged(treeRoot);
         }
     }
+
+            static class ThreadDumpNode {
+            private ThreadDump dump;
+            private String name;
+
+            ThreadDumpNode(ThreadDump dump) {
+                this.dump = dump;
+                this.name = getDefaultName();
+            }
+
+            void updateStatus(long time) {
+                Thread.State threadState = dump.getThreadState(time);
+                if (threadState != null) {
+                    name = (dump.getName() + " " + threadState).intern();
+                } else {
+                    name = getDefaultName();
+                }
+            }
+
+            private String getDefaultName() {
+                return (dump.getName() + " NOT_RUNNING").intern();
+            }
+
+            ThreadDump getThreadDump() {
+                return dump;
+            }
+
+            @Override
+            public String toString() {
+                return name;
+            }
+        }
 }

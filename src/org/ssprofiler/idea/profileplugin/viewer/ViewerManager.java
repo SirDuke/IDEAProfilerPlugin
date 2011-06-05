@@ -24,8 +24,6 @@
 
 package org.ssprofiler.idea.profileplugin.viewer;
 
-import org.ssprofiler.idea.profileplugin.viewer.oktech.OktechCPUReportViewerImpl;
-
 /**
  * Created by IntelliJ IDEA.
  * User: Ivan Serduk
@@ -33,6 +31,6 @@ import org.ssprofiler.idea.profileplugin.viewer.oktech.OktechCPUReportViewerImpl
  */
 public class ViewerManager {
     public static CPUReportViewer getCPUReportViewer() {
-        return new OktechCPUReportViewerImpl();
+        return new CPUReportViewerImpl();
     }
 }

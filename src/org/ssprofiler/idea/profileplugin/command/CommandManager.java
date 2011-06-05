@@ -35,6 +35,7 @@ public class CommandManager {
     }
 
     public static ProfilingCommand getProfilingCommand() {
-        return new OktechProfilingCommandImpl();
+       // return new OktechProfilingCommandImpl();
+        return new SSProfilingCommandImpl();
     }
 }

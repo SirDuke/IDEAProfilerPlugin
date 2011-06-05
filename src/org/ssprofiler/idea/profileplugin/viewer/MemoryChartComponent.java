@@ -22,9 +22,9 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.ssprofiler.idea.profileplugin.viewer.oktech;
+package org.ssprofiler.idea.profileplugin.viewer;
 
-import hu.oktech.profiler.core.data.MemoryData;
+import org.ssprofiler.model.MemoryInfo;
 
 import javax.swing.*;
 import java.awt.*;
@@ -37,6 +37,7 @@ import java.util.List;
  * Date: 13.05.11
  */
 public class MemoryChartComponent extends JComponent implements TimeIntervalAxis{
+    private static final long NANO = 1000000000;
     private static int CELL_WIDTH = 10;
     private static int CHART_HEIGHT = 300;
     private static int GAP_NORTH = 40;
@@ -44,14 +45,14 @@ public class MemoryChartComponent extends JComponent implements TimeIntervalAxis
     private static int GAP_SOUTH = 30;
     private static int GAP_EAST = 30;
 
-    private List<MemoryData> memoryData;
+    private List<MemoryInfo> MemoryInfo;
     private Image bufferImage;
     private int startX, endX, selectedX=-1;
     private int width, height;
 
-    public MemoryChartComponent(List<MemoryData> memoryData) {
-        this.memoryData = memoryData;
-        width = GAP_WEST + GAP_EAST + (int)(CELL_WIDTH * (memoryData.get(memoryData.size() - 1).getSystemTime() - memoryData.get(0).getSystemTime()) / 1000);
+    public MemoryChartComponent(List<MemoryInfo> MemoryInfo) {
+        this.MemoryInfo = MemoryInfo;
+        width = GAP_WEST + GAP_EAST + (int)(CELL_WIDTH * (MemoryInfo.get(MemoryInfo.size() - 1).getSystemTime() - MemoryInfo.get(0).getSystemTime()) / NANO);
         if (width < GAP_WEST + GAP_EAST + 400) { //leave space for legend
             width = GAP_WEST + GAP_EAST + 400;
         }
@@ -62,14 +63,14 @@ public class MemoryChartComponent extends JComponent implements TimeIntervalAxis
     public void init() {
         long maxValue = 0;
 
-        for (Iterator<MemoryData> iterator = memoryData.iterator(); iterator.hasNext();) {
-            MemoryData data = iterator.next();
+        for (Iterator<MemoryInfo> iterator = MemoryInfo.iterator(); iterator.hasNext();) {
+            MemoryInfo data = iterator.next();
             if (data.getUsedHeap() > maxValue) maxValue = data.getUsedHeap();
             if (data.getUsedNonHeap() > maxValue) maxValue = data.getUsedNonHeap();
         }
 
         float koef = (float) CHART_HEIGHT / maxValue;
-        MemoryData data = memoryData.get(0);
+        MemoryInfo data = MemoryInfo.get(0);
         long startTime = data.getSystemTime();
         int x = GAP_EAST;
         startX = x;
@@ -82,9 +83,9 @@ public class MemoryChartComponent extends JComponent implements TimeIntervalAxis
 
         Color colorUsedHeap = Color.red;
         Color colorUsedNonHeap = Color.blue;
-        for (int i = 1; i < memoryData.size(); i++) {
-            data = memoryData.get(i);
-            int x1 = GAP_EAST + (int) (CELL_WIDTH * (data.getSystemTime() - startTime)/1000);
+        for (int i = 1; i < MemoryInfo.size(); i++) {
+            data = MemoryInfo.get(i);
+            int x1 = GAP_EAST + (int) (CELL_WIDTH * (data.getSystemTime() - startTime)/NANO);
             int yUsedHeap1 = CHART_HEIGHT - Math.round(koef * data.getUsedHeap()) + GAP_NORTH;
             int yUsedNonHeap1 = CHART_HEIGHT - Math.round(koef * data.getUsedNonHeap()) + GAP_NORTH;
             g.setColor(colorUsedHeap);
@@ -145,7 +146,7 @@ public class MemoryChartComponent extends JComponent implements TimeIntervalAxis
         g.drawImage(bufferImage, 0, 0, null);
         if (selectedX != -1) {
             g.setColor(Color.BLACK);
-            g.drawLine(selectedX, GAP_NORTH, selectedX, CHART_HEIGHT);
+            g.drawLine(selectedX, GAP_NORTH, selectedX, GAP_NORTH + CHART_HEIGHT);
         }
     }
 

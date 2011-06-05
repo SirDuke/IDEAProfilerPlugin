@@ -22,39 +22,15 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.ssprofiler.idea.profileplugin.command;
-
-import hu.oktech.profiler.runtime.local.LocalJmxRuntime;
-
-import java.util.Properties;
+package org.ssprofiler.idea.profileplugin.viewer;
 
 /**
  * Created by IntelliJ IDEA.
  * User: Ivan Serduk
- * Date: 09.05.11
+ * Date: 12.05.11
  */
-public class OktechProfilingCommandImpl implements ProfilingCommand {
-    private LocalJmxRuntime localJmxRuntime;
-
-    public void start(String filename) {
-        Properties props = createProperties(filename);
-        localJmxRuntime = new LocalJmxRuntime();
-        try {
-            localJmxRuntime.start(props, null);
-        } catch (Exception e) {
-            e.printStackTrace();  //To change body of catch statement use File | Settings | File Templates.
-        }
-    }
-
-    public void stop() {
-        localJmxRuntime.stop();
-    }
-
-    private Properties createProperties(String fileName) {
-        Properties props = new Properties();
-        props.setProperty("output.file", fileName);
-        props.setProperty("thread.sampling.threadCpu", "true");
-        props.setProperty("sampling.millis", "200");
-        return props;
-    }
+public interface TimeIntervalAxis {
+    public int getStartX();
+    public int getEndX();
+    public void setSelectedX(int x);
 }
