@@ -37,7 +37,7 @@ import java.util.Iterator;
  * User: Ivan Serduk
  * Date: 11.05.11
  */
-public class ThreadChartComponent extends JComponent implements TimeIntervalAxis{
+public class ThreadChartComponent extends JComponent implements TimeIntervalAxis, ThreadFilterListener {
     private final long NANO = 1000000000;
 
     private static final int CELL_HEIGHT = 12;
@@ -71,10 +71,20 @@ public class ThreadChartComponent extends JComponent implements TimeIntervalAxis
         setPreferredSize(totalSize);
     }
 
-    public void init() {
-        float lengthPerNanosec = (float)CELL_WIDTH / NANO;
+    public void init(){
         offscreen = createImage(totalSize.width, totalSize.height + GAP_SOUTH);
         Graphics g = offscreen.getGraphics();
+        drawChart(g);
+    }
+
+    public void selectionChanged(Collection<ThreadDump> selectedThreads) {
+        threadsDumps = selectedThreads;
+        repaint();
+    }
+
+    private void drawChart(Graphics g) {
+        float lengthPerNanosec = (float)CELL_WIDTH / NANO;
+
         drawLegend(g);
         Iterator<ThreadDump> iter = threadsDumps.iterator();
 
@@ -96,7 +106,7 @@ public class ThreadChartComponent extends JComponent implements TimeIntervalAxis
                         TimeInterval interval = iterator.next();
                         int x0 = startX + Math.round((interval.getStartTime() - startTime) * lengthPerNanosec);
                         int x1 = startX + Math.round((interval.getEndTime() - startTime) * lengthPerNanosec);
-                        g.fillRect(x0, h, x1 - x0, CELL_HEIGHT);
+                        g.fillRect(x0, h, x1 - x0, CELL_HEIGHT - 1);
                     }
                 }
             }
@@ -158,10 +168,15 @@ public class ThreadChartComponent extends JComponent implements TimeIntervalAxis
 
     @Override
     public void paint(Graphics g) {
-        if (offscreen == null) {
+        /*if (offscreen == null) {
             init();
         }
-        g.drawImage(offscreen, 0, 0, null);
+        g.drawImage(offscreen, 0, 0, null);*/
+        drawChart(g);
+        g.setColor(new Color(200, 200, 200));
+        for (int i = chartBounds.x; i <= chartBounds.x + chartBounds.width; i+=CELL_WIDTH) {
+            g.drawLine(i, chartBounds.y, i, chartBounds.y + chartBounds.height);
+        }
         if (selectedX != -1) {
             g.setColor(Color.BLACK);
             g.drawLine(selectedX, chartBounds.y, selectedX, chartBounds.y + chartBounds.height);

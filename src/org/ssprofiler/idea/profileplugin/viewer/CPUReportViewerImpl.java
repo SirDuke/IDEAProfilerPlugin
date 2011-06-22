@@ -26,6 +26,7 @@ package org.ssprofiler.idea.profileplugin.viewer;
 
 import org.ssprofiler.model.ProfilerData;
 
+import javax.swing.*;
 import java.awt.*;
 import java.io.File;
 import java.io.IOException;
@@ -49,8 +50,35 @@ public class CPUReportViewerImpl implements CPUReportViewer {
             throw new IOException("Cannont parse file " + filename + ". Received exception: " + e.getMessage());
         }
 
-        /*JFrame frame = new JFrame();
-        CPUReportPanel cpuReportPanel = new CPUReportPanel(false);
+        CPUReportDialog cpuReportDialog = new CPUReportDialog(false);
+        CPUReportPanel cpuReportPanel = (CPUReportPanel)cpuReportDialog.getCPUReportPanel();
+        cpuReportPanel.init(PREFERRED_SIZE,
+                            profilerData.getThreadDumps(),
+                            profilerData.getMemoryInfo(),
+                            profilerData.getMethodSummaries(),
+                            profilerData.getMinTime(),
+                            profilerData.getMaxTime());
+        cpuReportDialog.setSize(PREFERRED_WIDTH, PREFERRED_HEIGHT);
+        cpuReportDialog.getPeer().setTitle("CPU Report " + filename);
+        cpuReportDialog.show();
+    }
+
+    public static void main(String[] args) {
+       // VirtualFile[] files = FileChooser.chooseFiles(JOptionPane.getRootFrame(), new FileChooserDescriptor(true, false, false, false, false, false));
+        String filename = System.getProperty("user.home") + File.separator + "cpu.cpu";
+        //String  filename =  files[0].getPath();
+        System.out.println(filename);
+        try {
+        ProfilerData profilerData = new ProfilerData();
+        try {
+            profilerData.readData(filename);
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw new IOException("Cannont parse file " + filename + ". Received exception: " + e.getMessage());
+        }
+
+        JFrame frame = new JFrame();
+        CPUReportPanel cpuReportPanel = new CPUReportPanel();
         cpuReportPanel.init(PREFERRED_SIZE,
                             profilerData.getThreadDumps(),
                             profilerData.getMemoryInfo(),
@@ -60,27 +88,7 @@ public class CPUReportViewerImpl implements CPUReportViewer {
         frame.setContentPane(cpuReportPanel.getMainPanel());
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         frame.setSize(PREFERRED_SIZE);
-        frame.setVisible(true);*/
-
-        CPUReportPanel cpuReportPanel = new CPUReportPanel(false);
-        cpuReportPanel.init(PREFERRED_SIZE,
-                            profilerData.getThreadDumps(),
-                            profilerData.getMemoryInfo(),
-                            profilerData.getMethodSummaries(),
-                            profilerData.getMinTime(),
-                            profilerData.getMaxTime());
-        cpuReportPanel.setSize(PREFERRED_WIDTH, PREFERRED_HEIGHT);
-        cpuReportPanel.getPeer().setTitle("CPU Report " + filename);
-        cpuReportPanel.show();
-    }
-
-    public static void main(String[] args) {
-       // VirtualFile[] files = FileChooser.chooseFiles(JOptionPane.getRootFrame(), new FileChooserDescriptor(true, false, false, false, false, false));
-        String filename = System.getProperty("user.home") + File.separator + "cpu.cpu";
-        //String  filename =  files[0].getPath();
-        System.out.println(filename);
-        try {
-            new CPUReportViewerImpl().view(filename);
+        frame.setVisible(true);
         } catch (IOException e) {
             e.printStackTrace();
         }
