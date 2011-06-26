@@ -24,11 +24,13 @@
 
 package org.ssprofiler.idea.profileplugin.viewer;
 
+import com.intellij.ui.components.JBScrollPane;
 import org.ssprofiler.model.ThreadDump;
 import org.ssprofiler.model.TimeInterval;
 
 import javax.swing.*;
 import java.awt.*;
+import java.awt.event.MouseListener;
 import java.util.Collection;
 import java.util.Iterator;
 
@@ -37,120 +39,61 @@ import java.util.Iterator;
  * User: Ivan Serduk
  * Date: 11.05.11
  */
-public class ThreadChartComponent extends JComponent implements TimeIntervalAxis, ThreadFilterListener {
+public class ThreadChartComponent extends JPanel implements ThreadFilterListener {
     private final long NANO = 1000000000;
 
     private static final int CELL_HEIGHT = 12;
     private static final int CELL_WIDTH = 12;
-    private static final int NAME_LENGTH = 300;
-    private static final int CPU_TIME_LENGTH = 50;
-    private static final int GAP_SOUTH = 3;
-    private static final int MIN_LEGEND_LENGTH = 400;
 
     private Collection<ThreadDump> threadsDumps;
-    private long startTime, endTime;
-    private Image offscreen;
-    private Rectangle chartBounds;
-    private Dimension totalSize;
-    private int selectedX = -1;
+    private long startTime;
+    private Dimension chartSize;
+    private ChartComponent chart;
+    private RowHeaderComponent rowHeader;
+    private JBScrollPane jbScrollPane;
 
     public ThreadChartComponent(Collection<ThreadDump> threadsDumps, long startTime, long endTime) {
+        super(new BorderLayout());
+        chart = new ChartComponent();
+
         this.threadsDumps = threadsDumps;
         this.startTime = startTime;
-        this.endTime = endTime;
 
-        int h = CELL_HEIGHT + 3;
         int chartHeight = threadsDumps.size() * CELL_HEIGHT;
         int chartWidth = Math.round((endTime - startTime) * CELL_WIDTH / NANO);
-        if (chartWidth < MIN_LEGEND_LENGTH) { // min space for Legend
-            chartWidth = MIN_LEGEND_LENGTH;
-        }
-        chartBounds = new Rectangle(NAME_LENGTH, h, chartWidth, chartHeight);
 
-        totalSize = new Dimension(NAME_LENGTH + chartWidth + CPU_TIME_LENGTH, h + chartHeight + GAP_SOUTH);
-        setPreferredSize(totalSize);
+        chartSize = new Dimension(chartWidth, chartHeight);
+        chart.setPreferredSize(chartSize);
+        jbScrollPane = new JBScrollPane(chart);
+        add(jbScrollPane);
+        rowHeader = new RowHeaderComponent();
+        rowHeader.setPreferredSize(new Dimension(rowHeader.estimateMaxThreadNameWidth(), chartHeight));
+        jbScrollPane.setRowHeaderView(rowHeader);
+
+        ColumnHeaderViewport columnHeader = new ColumnHeaderViewport();
+        columnHeader.setView(new ColumnHeaderComponent(chartWidth));
+        columnHeader.setPreferredSize(new Dimension(chartWidth, 2 * CELL_HEIGHT + 2));
+        jbScrollPane.setColumnHeader(columnHeader);
     }
 
-    public void init(){
-        offscreen = createImage(totalSize.width, totalSize.height + GAP_SOUTH);
-        Graphics g = offscreen.getGraphics();
-        drawChart(g);
-    }
-
+    // method from ThreadFilterListener
     public void selectionChanged(Collection<ThreadDump> selectedThreads) {
         threadsDumps = selectedThreads;
+        chartSize = new Dimension(chartSize.width, threadsDumps.size() * CELL_HEIGHT);
+        chart.setPreferredSize(chartSize);
+        Dimension rowHeaderSize = new Dimension(rowHeader.estimateMaxThreadNameWidth(), chartSize.height);
+        rowHeader.setPreferredSize(rowHeaderSize);
+        jbScrollPane.getRowHeader().setViewSize(rowHeaderSize);
+        jbScrollPane.revalidate();
         repaint();
     }
 
-    private void drawChart(Graphics g) {
-        float lengthPerNanosec = (float)CELL_WIDTH / NANO;
-
-        drawLegend(g);
-        Iterator<ThreadDump> iter = threadsDumps.iterator();
-
-        int startX = NAME_LENGTH;
-        int h = CELL_HEIGHT + 3;
-        Thread.State[] THREAD_STATE = Thread.State.values();
-
-        while (iter.hasNext()) {
-            ThreadDump threadDump = iter.next();
-            g.setColor(Color.BLACK);
-            g.drawString(threadDump.getName(), 0, h+CELL_HEIGHT);
-
-            for (int i = 0; i < THREAD_STATE.length; i++) {
-                java.util.List<TimeInterval> intervals = threadDump.getTimeIntevalsForState(THREAD_STATE[i]);
-                if (!intervals.isEmpty()) {
-                    Color color = getColorForState(THREAD_STATE[i]);
-                    g.setColor(color);
-                    for (Iterator<TimeInterval> iterator = intervals.iterator(); iterator.hasNext();) {
-                        TimeInterval interval = iterator.next();
-                        int x0 = startX + Math.round((interval.getStartTime() - startTime) * lengthPerNanosec);
-                        int x1 = startX + Math.round((interval.getEndTime() - startTime) * lengthPerNanosec);
-                        g.fillRect(x0, h, x1 - x0, CELL_HEIGHT - 1);
-                    }
-                }
-            }
-
-            g.setColor(Color.BLACK);
-            g.drawString(Long.toString(threadDump.getStackTraceTree().getCpuTimeTotal()), NAME_LENGTH + chartBounds.width + 1 , h+CELL_HEIGHT);
-            h += CELL_HEIGHT;
-        }
-
-        g.drawString("CPU Usage Time", NAME_LENGTH + chartBounds.width + 1, CELL_HEIGHT);
+    public void addChartMouseListener(MouseListener listener) {
+        chart.addMouseListener(listener);
     }
 
-    private void drawLegend(Graphics g) {
-        int x = NAME_LENGTH;
-        g.setColor(Color.BLACK);
-        g.drawString("Legend:", x, CELL_HEIGHT);
-
-        x += 50;
-        g.setColor(getColorForState(Thread.State.RUNNABLE));
-        g.fillRect(x, 0, CELL_WIDTH, CELL_HEIGHT);
-        g.setColor(Color.BLACK);
-        x += CELL_WIDTH + 2;
-        g.drawString("-Runnable", x, CELL_HEIGHT);
-
-        x += 62;
-        g.setColor(getColorForState(Thread.State.WAITING));
-        g.fillRect(x, 0, CELL_WIDTH, CELL_HEIGHT);
-        g.setColor(Color.BLACK);
-        x += CELL_WIDTH + 2;
-        g.drawString("-Waiting", x, CELL_HEIGHT);
-
-        x += 50;
-        g.setColor(getColorForState(Thread.State.TIMED_WAITING));
-        g.fillRect(x, 0, CELL_WIDTH, CELL_HEIGHT);
-        g.setColor(Color.BLACK);
-        x += CELL_WIDTH + 2;
-        g.drawString("-Timed_Waiting", x, CELL_HEIGHT);
-
-        x += 93;
-        g.setColor(getColorForState(Thread.State.BLOCKED));
-        g.fillRect(x, 0, CELL_WIDTH, CELL_HEIGHT);
-        g.setColor(Color.BLACK);
-        x += CELL_WIDTH + 2;
-        g.drawString("-Blocked", x, CELL_HEIGHT);
+    public void removeChartMouseListener(MouseListener listener) {
+        chart.removeMouseListener(listener);
     }
 
     private Color getColorForState(Thread.State state) {
@@ -166,33 +109,184 @@ public class ThreadChartComponent extends JComponent implements TimeIntervalAxis
         return Color.white;
     }
 
-    @Override
-    public void paint(Graphics g) {
-        /*if (offscreen == null) {
-            init();
+    class ChartComponent extends JComponent implements TimeIntervalAxis{
+        private int selectedX;
+
+        @Override
+        public void paint(Graphics g) {
+            drawChart(g);
+            if (selectedX != -1) {
+                g.setColor(Color.BLACK);
+                g.drawLine(selectedX, 0, selectedX, chartSize.height);
+            }
         }
-        g.drawImage(offscreen, 0, 0, null);*/
-        drawChart(g);
-        g.setColor(new Color(200, 200, 200));
-        for (int i = chartBounds.x; i <= chartBounds.x + chartBounds.width; i+=CELL_WIDTH) {
-            g.drawLine(i, chartBounds.y, i, chartBounds.y + chartBounds.height);
+
+        private void drawChart(Graphics g) {
+            float lengthPerNanosec = (float)CELL_WIDTH / NANO;
+
+            Iterator<ThreadDump> iter = threadsDumps.iterator();
+
+            int startX = 0;
+            int h = 0;
+            Thread.State[] THREAD_STATE = Thread.State.values();
+
+            while (iter.hasNext()) {
+                ThreadDump threadDump = iter.next();
+
+                for (int i = 0; i < THREAD_STATE.length; i++) {
+                    java.util.List<TimeInterval> intervals = threadDump.getTimeIntevalsForState(THREAD_STATE[i]);
+                    if (!intervals.isEmpty()) {
+                        Color color = getColorForState(THREAD_STATE[i]);
+                        g.setColor(color);
+                        for (Iterator<TimeInterval> iterator = intervals.iterator(); iterator.hasNext();) {
+                            TimeInterval interval = iterator.next();
+                            int x0 = startX + Math.round((interval.getStartTime() - startTime) * lengthPerNanosec);
+                            int x1 = startX + Math.round((interval.getEndTime() - startTime) * lengthPerNanosec);
+                            g.fillRect(x0, h, x1 - x0, CELL_HEIGHT - 1);
+                        }
+                    }
+                }
+                h += CELL_HEIGHT;
+            }
         }
-        if (selectedX != -1) {
+
+        public int getStartX() {
+            return 0;
+        }
+
+        public int getEndX() {
+            return chartSize.width;
+        }
+
+        public void setSelectedX(int x) {
+            selectedX = x;
+            repaint();
+        }
+    }
+
+    class RowHeaderComponent extends JComponent {
+        private final int START_X = 5;
+        @Override
+        public void paint(Graphics g) {
+            Iterator<ThreadDump> iter = threadsDumps.iterator();
+            int h = 0;
+            while (iter.hasNext()) {
+                ThreadDump threadDump = iter.next();
+                g.setColor(Color.BLACK);
+                g.drawString(threadDump.getName(), START_X, h+CELL_HEIGHT);
+                h+=CELL_HEIGHT;
+            }
+        }
+
+            //estimates max thread name width when it is painted on the screen
+        int estimateMaxThreadNameWidth() {
+            Font font = UIManager.getFont("Panel.font");
+            FontMetrics fontMetrics = getFontMetrics(font);
+            int maxWidth = 0;
+            for (Iterator<ThreadDump> iterator = threadsDumps.iterator(); iterator.hasNext();) {
+                ThreadDump threadDump = iterator.next();
+                int width = fontMetrics.stringWidth(threadDump.getName());
+                if (width > maxWidth) maxWidth = width;
+            }
+            return maxWidth + 2*START_X; //one "START_X at the start and one after the end, between thread names and chart
+        }
+    }
+
+    class ColumnHeaderViewport extends JViewport {
+        @Override
+        public void paint(Graphics g) {
+            drawLegend(g);
+            g.translate(0, CELL_HEIGHT);
+            super.paint(g);    //To change body of overridden methods use File | Settings | File Templates.
+        }
+
+        private void drawLegend(Graphics g) {
+            Font font = g.getFont();
+            g.setFont(font.deriveFont((float) font.getSize() * 0.95f));
+            int x = 3;
+
+            g.setColor(getColorForState(Thread.State.RUNNABLE));
+            g.fillRect(x, 0, CELL_WIDTH, CELL_HEIGHT);
             g.setColor(Color.BLACK);
-            g.drawLine(selectedX, chartBounds.y, selectedX, chartBounds.y + chartBounds.height);
+            x += CELL_WIDTH + 2;
+            g.drawString("-Runnable", x, CELL_HEIGHT-2);
+
+            x += 62;
+            g.setColor(getColorForState(Thread.State.WAITING));
+            g.fillRect(x, 0, CELL_WIDTH, CELL_HEIGHT);
+            g.setColor(Color.BLACK);
+            x += CELL_WIDTH + 2;
+            g.drawString("-Waiting", x, CELL_HEIGHT-2);
+
+            x += 50;
+            g.setColor(getColorForState(Thread.State.TIMED_WAITING));
+            g.fillRect(x, 0, CELL_WIDTH, CELL_HEIGHT);
+            g.setColor(Color.BLACK);
+            x += CELL_WIDTH + 2;
+            g.drawString("-Timed_Waiting", x, CELL_HEIGHT-2);
+
+            x += 93;
+            g.setColor(getColorForState(Thread.State.BLOCKED));
+            g.fillRect(x, 0, CELL_WIDTH, CELL_HEIGHT);
+            g.setColor(Color.BLACK);
+            x += CELL_WIDTH + 2;
+            g.drawString("-Blocked", x, CELL_HEIGHT-2);
         }
     }
 
-    public int getStartX() {
-        return chartBounds.x;
-    }
+    class ColumnHeaderComponent extends JComponent {
+        private int width;
+        private int height;
 
-    public int getEndX() {
-        return chartBounds.x + chartBounds.width;
-    }
+        ColumnHeaderComponent(int width) {
+            this.width = width;
+            this.height = CELL_HEIGHT + 2;
+            setPreferredSize(new Dimension(width, height));
+        }
 
-    public void setSelectedX(int x) {
-        selectedX = x;
-        repaint();
+        public int getHeight() {
+            return height;
+        }
+
+        @Override
+        public void paint(Graphics g) {
+            Font font = g.getFont();
+            g.setFont(font.deriveFont((float) font.getSize() * 0.9f));
+            FontMetrics fontMetrics = g.getFontMetrics();
+            int x = CELL_WIDTH;
+            int h = 0;
+            int m = 0;
+            int s = 0;
+            while (x <= width) {
+                for (int i = 0; i < 9 && x <=width; i++) {
+                    g.drawLine(x, height, x, height - 2);
+                    x += CELL_WIDTH;
+                    s++;
+                }
+                s++;
+                StringBuffer timeString = new StringBuffer();
+                if (s == 60) {
+                    m++;
+                    s = 0;
+                    if (m == 60) {
+                        h++;
+                        m = 0;
+                    }
+                    if (h > 0) {
+                        timeString.append(h).append('h');
+                    }
+                    timeString.append(m).append('m');
+                }
+                if (x < width) {
+                    g.drawLine(x, height, x, height - 3);
+
+                    if (s > 0) timeString.append(s).append('s');
+                    String ts = timeString.toString();
+                    int width = fontMetrics.stringWidth(ts);
+                    g.drawString(ts, x - width / 2, height - 4);
+                    x += CELL_WIDTH;
+                }
+            }
+        }
     }
 }

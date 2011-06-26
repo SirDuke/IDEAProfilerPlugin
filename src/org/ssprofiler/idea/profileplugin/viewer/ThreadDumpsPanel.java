@@ -27,7 +27,7 @@ public class ThreadDumpsPanel extends Splitter {
         }
 
         ThreadChartComponent tcc = new ThreadChartComponent(threadDumps, minTime, maxTime);
-        this.setFirstComponent(new JBScrollPane(tcc));
+        this.setFirstComponent(tcc);
 
         JPanel panelThreadDumps = new JPanel(new BorderLayout());
         this.setSecondComponent(panelThreadDumps);
@@ -50,6 +50,6 @@ public class ThreadDumpsPanel extends Splitter {
         filterThreadsDialog.addThreadFilterListener(threadDumpsTree);
         panelThreadDumps.add(new JBScrollPane(threadDumpsTree));
 
-        tcc.addMouseListener(new ChartMouseListenter(threadDumpsTree, minTime, maxTime));
+        tcc.addChartMouseListener(new ChartMouseListenter(threadDumpsTree, minTime, maxTime));
     }
 }
