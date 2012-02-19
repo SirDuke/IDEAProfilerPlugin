@@ -30,6 +30,6 @@
   </actions>
 
   <extensions defaultExtensionNs="com.intellij">
-    <!-- Add your extensions here -->
+    <toolWindow id="CPU Report" anchor="bottom" factoryClass="org.ssprofiler.idea.profileplugin.viewer.toolwindow.SSProfilerToolWindowFactory"/>
   </extensions>
 </idea-plugin>

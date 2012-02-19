@@ -1,5 +1,5 @@
 /*
- * Copyright 2011, Ivan Serduk. All rights reserved.
+ * Copyright 2011-2012, Ivan Serduk. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without modification, are
  * permitted provided that the following conditions are met:
@@ -26,15 +26,6 @@ package org.ssprofiler.idea.profileplugin.actions;
 
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
-import com.intellij.openapi.fileChooser.FileChooser;
-import com.intellij.openapi.fileChooser.FileChooserDescriptor;
-import com.intellij.openapi.ui.Messages;
-import com.intellij.openapi.vfs.LocalFileSystem;
-import com.intellij.openapi.vfs.VirtualFile;
-import org.ssprofiler.idea.profileplugin.viewer.ViewerManager;
-
-import javax.swing.*;
-import java.io.IOException;
 
 /**
  * Created by IntelliJ IDEA.
@@ -43,30 +34,6 @@ import java.io.IOException;
  */
 public class ViewCPUReportAction extends AnAction {
     public void actionPerformed(AnActionEvent event) {
-        /*String dir = System.getProperty("user.home");
-        File dirUserHome = new File(dir);
-        File[] files = dirUserHome.listFiles(new FileFilter() {
-            public boolean accept(File pathname) {
-                String s = pathname.getName();
-                return ((s.startsWith("cpu")) && (s.endsWith("cpu")));
-            }
-        });*/
 
-        String dir = System.getProperty("user.home");
-        VirtualFile dirUserHome = LocalFileSystem.getInstance().findFileByPath(dir);
-        FileChooserDescriptor fileChooserDescriptor = new FileChooserDescriptor(true, false, false, false, false, false);
-        fileChooserDescriptor.setTitle("Select CPU report file");
-        VirtualFile[] files = FileChooser.chooseFiles(JOptionPane.getRootFrame(), fileChooserDescriptor, dirUserHome);
-
-        if (files.length > 0) {
-            String filename = files[0].getPath();
-            try {
-
-                ViewerManager.getCPUReportViewer().view(filename);
-            } catch (IOException e) {
-                e.printStackTrace();
-                Messages.showMessageDialog("Cannot parse the file: " + filename, "Error", null);
-            }
-        }
     }
 }

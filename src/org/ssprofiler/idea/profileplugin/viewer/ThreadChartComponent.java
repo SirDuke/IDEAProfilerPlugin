@@ -31,8 +31,7 @@ import org.ssprofiler.model.TimeInterval;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.MouseListener;
-import java.util.Collection;
-import java.util.Iterator;
+import java.util.*;
 
 /**
  * Created by IntelliJ IDEA.
@@ -76,7 +75,6 @@ public class ThreadChartComponent extends JPanel implements ThreadFilterListener
         jbScrollPane.setColumnHeader(columnHeader);
     }
 
-    // method from ThreadFilterListener
     public void selectionChanged(Collection<ThreadDump> selectedThreads) {
         threadsDumps = selectedThreads;
         chartSize = new Dimension(chartSize.width, threadsDumps.size() * CELL_HEIGHT);
@@ -133,13 +131,12 @@ public class ThreadChartComponent extends JPanel implements ThreadFilterListener
             while (iter.hasNext()) {
                 ThreadDump threadDump = iter.next();
 
-                for (int i = 0; i < THREAD_STATE.length; i++) {
-                    java.util.List<TimeInterval> intervals = threadDump.getTimeIntevalsForState(THREAD_STATE[i]);
+                for (Thread.State state : THREAD_STATE) {
+                    java.util.List<TimeInterval> intervals = threadDump.getTimeIntevalsForState(state);
                     if (!intervals.isEmpty()) {
-                        Color color = getColorForState(THREAD_STATE[i]);
+                        Color color = getColorForState(state);
                         g.setColor(color);
-                        for (Iterator<TimeInterval> iterator = intervals.iterator(); iterator.hasNext();) {
-                            TimeInterval interval = iterator.next();
+                        for (TimeInterval interval : intervals) {
                             int x0 = startX + Math.round((interval.getStartTime() - startTime) * lengthPerNanosec);
                             int x1 = startX + Math.round((interval.getEndTime() - startTime) * lengthPerNanosec);
                             g.fillRect(x0, h, x1 - x0, CELL_HEIGHT - 1);
@@ -183,8 +180,7 @@ public class ThreadChartComponent extends JPanel implements ThreadFilterListener
             Font font = UIManager.getFont("Panel.font");
             FontMetrics fontMetrics = getFontMetrics(font);
             int maxWidth = 0;
-            for (Iterator<ThreadDump> iterator = threadsDumps.iterator(); iterator.hasNext();) {
-                ThreadDump threadDump = iterator.next();
+            for (ThreadDump threadDump : threadsDumps) {
                 int width = fontMetrics.stringWidth(threadDump.getName());
                 if (width > maxWidth) maxWidth = width;
             }
@@ -264,7 +260,7 @@ public class ThreadChartComponent extends JPanel implements ThreadFilterListener
                     s++;
                 }
                 s++;
-                StringBuffer timeString = new StringBuffer();
+                StringBuilder timeString = new StringBuilder();
                 if (s == 60) {
                     m++;
                     s = 0;

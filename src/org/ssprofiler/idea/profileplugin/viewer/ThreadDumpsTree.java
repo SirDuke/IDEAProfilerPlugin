@@ -3,8 +3,11 @@ package org.ssprofiler.idea.profileplugin.viewer;
 import com.intellij.ui.treeStructure.Tree;
 import org.ssprofiler.model.ThreadDump;
 
+import javax.swing.*;
 import javax.swing.tree.DefaultMutableTreeNode;
 import javax.swing.tree.DefaultTreeModel;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.util.Collection;
 import java.util.Iterator;
 
@@ -21,6 +24,7 @@ public class ThreadDumpsTree extends Tree implements ThreadFilterListener {
         super(new DefaultTreeModel(new DefaultMutableTreeNode("Select time at the chart above to view stacktraces")));
         this.threadDumps = threadDumps;
         initTree(threadDumps);
+        addMouseListener(new TreeMouseListener());
     }
 
     // time in nanoseconds
@@ -37,9 +41,8 @@ public class ThreadDumpsTree extends Tree implements ThreadFilterListener {
             child.removeAllChildren();
             if ((threadDump.getFirstDumpSystemTime() < time) && (threadDump.getLastDumpSystemTime() >= time)) {
                 String[] stack = threadDump.getStackTrace(time);
-                Thread.State state = threadDump.getThreadState(time);
-                for (int j = 0; j < stack.length; j++) {
-                    DefaultMutableTreeNode stackTraceNode = new DefaultMutableTreeNode(stack[j]);
+                for (String aStack : stack) {
+                    DefaultMutableTreeNode stackTraceNode = new DefaultMutableTreeNode(aStack);
                     child.add(stackTraceNode);
                 }
             }
@@ -58,9 +61,7 @@ public class ThreadDumpsTree extends Tree implements ThreadFilterListener {
         DefaultTreeModel treeModel = (DefaultTreeModel) this.getModel();
         DefaultMutableTreeNode root = new DefaultMutableTreeNode("Stacktraces");
         root.removeAllChildren();
-        Iterator<ThreadDump> iter = threadDumps.iterator();
-        while (iter.hasNext()) {
-            ThreadDump dump = iter.next();
+        for (ThreadDump dump : threadDumps) {
             DefaultMutableTreeNode newNode = new DefaultMutableTreeNode(new ThreadDumpNode(dump));
             root.add(newNode);
         }
@@ -96,6 +97,39 @@ public class ThreadDumpsTree extends Tree implements ThreadFilterListener {
         @Override
         public String toString() {
             return name;
+        }
+    }
+    
+    private class TreeMouseListener extends MouseAdapter {
+        @Override
+        public void mousePressed(MouseEvent e) {
+            if ((SwingUtilities.isLeftMouseButton(e) && e.getClickCount() > 1)) {
+                DefaultMutableTreeNode node = (DefaultMutableTreeNode) getLastSelectedPathComponent();
+                System.out.println(node.getUserObject());
+/*private PsiClass[] getClasses() {
+                    Project project = myElement.getProject();
+
+                    Module module = getModule(project);
+
+                    GlobalSearchScope globalsearchscope;
+                    if (module != null) {
+                        globalsearchscope = GlobalSearchScope.moduleWithDependenciesAndLibrariesScope(module);
+                    } else {
+                        globalsearchscope = GlobalSearchScope.projectScope(project);
+                    }
+
+                    JavaPsiFacade javaPsiFacade = JavaPsiFacade.getInstance(project);
+                    if (potentialClassName.indexOf('.') != -1) {
+
+                        return javaPsiFacade.findClasses(potentialClassName, globalsearchscope);
+                    } else {
+                        PsiShortNamesCache cache = javaPsiFacade.getShortNamesCache();
+
+                        return cache.getClassesByName(potentialClassName, globalsearchscope);
+                    }
+                }
+*/
+            }
         }
     }
 }

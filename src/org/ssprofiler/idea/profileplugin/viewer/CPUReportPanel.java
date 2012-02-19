@@ -1,5 +1,5 @@
 /*
- * Copyright 2011, Ivan Serduk. All rights reserved.
+ * Copyright 2011-2012, Ivan Serduk. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without modification, are
  * permitted provided that the following conditions are met:
@@ -29,14 +29,12 @@ import com.intellij.ui.treeStructure.treetable.ListTreeTableModelOnColumns;
 import com.intellij.ui.treeStructure.treetable.TreeTable;
 import com.intellij.ui.treeStructure.treetable.TreeTableModel;
 import com.intellij.util.ui.ColumnInfo;
-import org.ssprofiler.model.MemoryInfo;
-import org.ssprofiler.model.MethodSummary;
-import org.ssprofiler.model.StackTraceTree;
-import org.ssprofiler.model.ThreadDump;
+import org.ssprofiler.model.*;
 
 import javax.swing.*;
 import javax.swing.tree.DefaultMutableTreeNode;
 import java.awt.*;
+import java.io.IOException;
 import java.text.DecimalFormat;
 import java.util.Collection;
 import java.util.Iterator;
@@ -48,18 +46,21 @@ import java.util.Map;
  * User: Ivan Serduk
  * Date: 14.05.11
  */
-public class CPUReportPanel {
+public class CPUReportPanel extends JPanel {
     private static final long NANO = 1000000000;
 
     private static String SAMPLING_TREE_COLUMN_HEADER = "Sampling Tree";
     private static String SAMPLES_COLUMN_HEADER = "Samples count";
     private static String CPU_COLUMN_HEADER = "CPU time usage";
 
+    private static final int PREFERRED_WIDTH = 1000;
+    private static final int PREFERRED_HEIGHT = 600;
+    private static final Dimension PREFERRED_SIZE = new Dimension(PREFERRED_WIDTH, PREFERRED_HEIGHT);
+
     private ThreadDumpsPanel panelThreadDumps;
     private JPanel panelSamples;
     private JPanel panelMemory;
     private JPanel panelSamplingSummary;
-    private JPanel panelMain;
 
     private Map<Long, ThreadDump> threadDumps;
     private List<MemoryInfo> memoryDataList;
@@ -67,10 +68,10 @@ public class CPUReportPanel {
     private DecimalFormat doubleFormat = new DecimalFormat("##.##");
     private Dimension preferredSize;
 
-    protected CPUReportPanel() {
-        panelMain = new JPanel(new BorderLayout());
+    public CPUReportPanel() {
+        super(new BorderLayout());
         JTabbedPane jTabbedPane = new JTabbedPane();
-        panelMain.add(jTabbedPane);
+        this.add(jTabbedPane);
         panelThreadDumps = new ThreadDumpsPanel();
         jTabbedPane.add("Threads", panelThreadDumps);
         panelSamples = new JPanel();
@@ -81,8 +82,23 @@ public class CPUReportPanel {
         jTabbedPane.add("Sampling Summary", panelSamplingSummary);
     }
 
-
-    public void init(Dimension preferredSize,
+    public void loadDataFromFile(String filename) throws IOException {
+        ProfilerData profilerData = new ProfilerData();
+        try {
+            profilerData.readData(filename);
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw new IOException("Cannot parse file " + filename + ". Received exception: " + e.getMessage());
+        }
+        init(PREFERRED_SIZE,
+                profilerData.getThreadDumps(),
+                profilerData.getMemoryInfo(),
+                profilerData.getMethodSummaries(),
+                profilerData.getMinTime(),
+                profilerData.getMaxTime());
+    }
+    
+    private void init(Dimension preferredSize,
                      Map<Long, ThreadDump> threadDumps,
                      List<MemoryInfo> memoryDataList,
                      List<MethodSummary> methodSummaries,
@@ -93,15 +109,11 @@ public class CPUReportPanel {
         this.memoryDataList = memoryDataList;
         this.minTime = minTime;
         this.maxTime = maxTime;
-        panelMain.setPreferredSize(preferredSize);
+        this.setPreferredSize(preferredSize);
         panelThreadDumps.init(threadDumps.values(), minTime, maxTime);
         initMemoryChartPanel();
         initSampingTreePanel(threadDumps.values());
         initSamplingSummaryTree(threadDumps.values(), methodSummaries);
-    }
-
-    JPanel getMainPanel() {
-        return panelMain;
     }
 
     private void initMemoryChartPanel() {
@@ -127,8 +139,7 @@ public class CPUReportPanel {
         }
         panelSamples.setLayout(new BorderLayout());
         final DefaultMutableTreeNode root = new DefaultMutableTreeNode(new StackTraceTree("", 0));
-        for (Iterator<ThreadDump> iterator = threadDumps.iterator(); iterator.hasNext();) {
-            ThreadDump threadDump = iterator.next();
+        for (ThreadDump threadDump : threadDumps) {
             DefaultMutableTreeNode newNode = new DefaultMutableTreeNode(threadDump.getStackTraceTree());
             root.add(newNode);
             buildSamplingTree(newNode, threadDump.getStackTraceTree().getChildren());
@@ -188,8 +199,7 @@ public class CPUReportPanel {
     }
 
     private void buildSamplingTree(DefaultMutableTreeNode treeNode, Collection<StackTraceTree> children) {
-        for (Iterator<StackTraceTree> iterator = children.iterator(); iterator.hasNext();) {
-            StackTraceTree subtree = iterator.next();
+        for (StackTraceTree subtree : children) {
             DefaultMutableTreeNode newNode = new DefaultMutableTreeNode(subtree);
             treeNode.add(newNode);
             buildSamplingTree(newNode, subtree.getChildren());
