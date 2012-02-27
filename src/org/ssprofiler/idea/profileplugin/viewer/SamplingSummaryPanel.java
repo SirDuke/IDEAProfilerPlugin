@@ -1,3 +1,27 @@
+/*
+ * Copyright 2012, Ivan Serduk. All rights reserved.
+ *
+ *  Redistribution and use in source and binary forms, with or without modification, are
+ *  permitted provided that the following conditions are met:
+ *
+ *     1. Redistributions of source code must retain the above copyright notice, this list of
+ *        conditions and the following disclaimer.
+ *
+ *     2. Redistributions in binary form must reproduce the above copyright notice, this list
+ *        of conditions and the following disclaimer in the documentation and/or other materials
+ *        provided with the distribution.
+ *
+ *  THIS SOFTWARE IS PROVIDED ``AS IS'' AND ANY EXPRESS OR IMPLIED
+ *  WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND
+ *  FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL Ivan Serduk OR
+ *  CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ *  CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ *  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+ *  ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ *  NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
+ *  ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
 package org.ssprofiler.idea.profileplugin.viewer;
 
 import com.intellij.ui.components.JBScrollPane;
@@ -6,6 +30,7 @@ import com.intellij.ui.treeStructure.treetable.ListTreeTableModel;
 import com.intellij.ui.treeStructure.treetable.TreeTable;
 import com.intellij.ui.treeStructure.treetable.TreeTableModel;
 import com.intellij.util.ui.ColumnInfo;
+import org.ssprofiler.idea.profileplugin.projectcontext.ProjectContext;
 import org.ssprofiler.model.MethodSummary;
 import org.ssprofiler.model.StackTraceTree;
 import org.ssprofiler.model.ThreadDump;
@@ -19,13 +44,13 @@ import javax.swing.table.TableColumn;
 import javax.swing.table.TableColumnModel;
 import javax.swing.tree.DefaultMutableTreeNode;
 import java.awt.*;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.text.DecimalFormat;
 import java.util.Collection;
-import java.util.Iterator;
 import java.util.List;
 
 /**
- * Created by IntelliJ IDEA.
  * User: Ivan Serduk
  * Date: 24.05.11
  */
@@ -36,14 +61,18 @@ public class SamplingSummaryPanel extends JPanel {
 
     private List<MethodSummary> methodSummaries;
     private JTable tableMethods;
-    private TreeTable treeTableMethodUsages;
     private MethodUsageTreeNode root;
+    
+    private ProjectContext projectContext;
 
     public SamplingSummaryPanel() {
     }
 
-    void init(final List<MethodSummary> methodSummaries, final Collection<ThreadDump> threadDumps,  Dimension preferredSize) {
+    void init(final List<MethodSummary> methodSummaries, final Collection<ThreadDump> threadDumps,  Dimension preferredSize, ProjectContext projectContext) {
+        removeAll();
+        
         this.methodSummaries = methodSummaries;
+        this.projectContext = projectContext;
 
         setPreferredSize(preferredSize);
         setLayout(new GridLayout(2,1));
@@ -52,13 +81,16 @@ public class SamplingSummaryPanel extends JPanel {
         tableMethods.setDefaultRenderer(Double.class, new DoubleTableCellRenderer());
         tableMethods.setAutoscrolls(true);
         tableMethods.setAutoCreateRowSorter(true);
+        tableMethods.addMouseListener(new TableMethodsMouseListener());
 
         root = new MethodUsageTreeNode("Select method in the table above");
-        final ListTreeTableModel treeTablemodel = new ListTreeTableModel(root, createColumns());
-        treeTableMethodUsages = new TreeTable(treeTablemodel);
+        final ListTreeTableModel treeTableModel = new ListTreeTableModel(root, createColumns());
+        TreeTable treeTableMethodUsages = new TreeTable(treeTableModel);
         treeTableMethodUsages.setDefaultRenderer(Double.class, new DoubleTableCellRenderer());
 
-        int columnCount = COLUMN_NAMES.length;
+        TreeTablePopupTriggerMouseListener treeTablePopupTriggerMouseListener = new TreeTablePopupTriggerMouseListener(treeTableMethodUsages, projectContext);
+        treeTableMethodUsages.addMouseListener(treeTablePopupTriggerMouseListener);
+
         setColumnSizes(tableMethods.getColumnModel(), preferredSize.width);
         setColumnSizes(treeTableMethodUsages.getColumnModel(), preferredSize.width);
 
@@ -72,7 +104,7 @@ public class SamplingSummaryPanel extends JPanel {
                     root.removeAllChildren();
                     root.setTree(tree);
                     updateTreeMethodUsages(tree.getChildren(), root);
-                    treeTablemodel.nodeStructureChanged(root);
+                    treeTableModel.nodeStructureChanged(root);
 
                 }
             }
@@ -84,8 +116,7 @@ public class SamplingSummaryPanel extends JPanel {
 
     private void updateTreeMethodUsages(Collection<StackTraceTree> subTrees, DefaultMutableTreeNode curRoot) {
         if (subTrees != null) {
-            for (Iterator<StackTraceTree> iterator = subTrees.iterator(); iterator.hasNext();) {
-                StackTraceTree tree = iterator.next();
+            for (StackTraceTree tree : subTrees) {
                 DefaultMutableTreeNode node = new MethodUsageTreeNode(tree);
                 curRoot.add(node);
                 updateTreeMethodUsages(tree.getChildren(), node);
@@ -224,7 +255,7 @@ public class SamplingSummaryPanel extends JPanel {
         @Override
         protected void setValue(Object value) {
             setHorizontalAlignment(JLabel.RIGHT);
-             setText((value != null) ?doubleFormat.format(value) : "");
+            setText((value != null) ? doubleFormat.format(value) : "");
         }
     }
 
@@ -263,6 +294,18 @@ public class SamplingSummaryPanel extends JPanel {
 
         Double getSystemReal() {
             return (tree != null) ? (double)tree.getSystemTimeOwn() / NANO : null;
+        }
+    }
+    
+    class TableMethodsMouseListener extends MouseAdapter {
+        @Override
+        public void mouseClicked(MouseEvent e) {
+            if (e.getClickCount() > 1) {
+                JTable target = (JTable)e.getSource();
+                int row = target.getSelectedRow();
+                String selectedMethod = (String)target.getModel().getValueAt(row, 0);
+                projectContext.openSourceFile(selectedMethod);
+            }
         }
     }
 }

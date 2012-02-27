@@ -29,6 +29,7 @@ import com.intellij.openapi.fileChooser.FileChooserDescriptor;
 import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VirtualFile;
+import org.ssprofiler.idea.profileplugin.projectcontext.ProjectContext;
 import org.ssprofiler.idea.profileplugin.viewer.CPUReportPanel;
 
 import javax.swing.*;
@@ -44,14 +45,14 @@ import java.io.IOException;
 public class ToolWindowContent extends JPanel {
     private CPUReportPanel cpuReportPanel;
 
-    public ToolWindowContent() {
+    public ToolWindowContent(ProjectContext projectContext) {
         super(new BorderLayout());
-        createCpuReportPanel();
+        createCpuReportPanel(projectContext);
         createNorthPanel();
     }
 
-    private void createCpuReportPanel() {
-        cpuReportPanel = new CPUReportPanel();
+    private void createCpuReportPanel(ProjectContext projectContext) {
+        cpuReportPanel = new CPUReportPanel(projectContext);
         this.add(cpuReportPanel);
     }
     

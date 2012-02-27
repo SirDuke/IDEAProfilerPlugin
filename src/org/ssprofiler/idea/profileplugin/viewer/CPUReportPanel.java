@@ -1,25 +1,25 @@
 /*
- * Copyright 2011-2012, Ivan Serduk. All rights reserved.
+ * Copyright 2012, Ivan Serduk. All rights reserved.
  *
- * Redistribution and use in source and binary forms, with or without modification, are
- * permitted provided that the following conditions are met:
+ *  Redistribution and use in source and binary forms, with or without modification, are
+ *  permitted provided that the following conditions are met:
  *
- *    1. Redistributions of source code must retain the above copyright notice, this list of
- *       conditions and the following disclaimer.
+ *     1. Redistributions of source code must retain the above copyright notice, this list of
+ *        conditions and the following disclaimer.
  *
- *    2. Redistributions in binary form must reproduce the above copyright notice, this list
- *       of conditions and the following disclaimer in the documentation and/or other materials
- *       provided with the distribution.
+ *     2. Redistributions in binary form must reproduce the above copyright notice, this list
+ *        of conditions and the following disclaimer in the documentation and/or other materials
+ *        provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED ``AS IS'' AND ANY EXPRESS OR IMPLIED
- * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND
- * FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL Ivan Serduk OR
- * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
- * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
- * ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
- * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *  THIS SOFTWARE IS PROVIDED ``AS IS'' AND ANY EXPRESS OR IMPLIED
+ *  WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND
+ *  FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL Ivan Serduk OR
+ *  CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ *  CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ *  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+ *  ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ *  NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
+ *  ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 package org.ssprofiler.idea.profileplugin.viewer;
@@ -29,6 +29,7 @@ import com.intellij.ui.treeStructure.treetable.ListTreeTableModelOnColumns;
 import com.intellij.ui.treeStructure.treetable.TreeTable;
 import com.intellij.ui.treeStructure.treetable.TreeTableModel;
 import com.intellij.util.ui.ColumnInfo;
+import org.ssprofiler.idea.profileplugin.projectcontext.ProjectContext;
 import org.ssprofiler.model.*;
 
 import javax.swing.*;
@@ -37,21 +38,19 @@ import java.awt.*;
 import java.io.IOException;
 import java.text.DecimalFormat;
 import java.util.Collection;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
 /**
- * Created by IntelliJ IDEA.
  * User: Ivan Serduk
  * Date: 14.05.11
  */
 public class CPUReportPanel extends JPanel {
     private static final long NANO = 1000000000;
 
-    private static String SAMPLING_TREE_COLUMN_HEADER = "Sampling Tree";
-    private static String SAMPLES_COLUMN_HEADER = "Samples count";
-    private static String CPU_COLUMN_HEADER = "CPU time usage";
+    private static final String SAMPLING_TREE_COLUMN_HEADER = "Sampling Tree";
+    private static final String SAMPLES_COLUMN_HEADER = "Samples count";
+    private static final String CPU_COLUMN_HEADER = "CPU time usage";
 
     private static final int PREFERRED_WIDTH = 1000;
     private static final int PREFERRED_HEIGHT = 600;
@@ -67,9 +66,14 @@ public class CPUReportPanel extends JPanel {
     private long minTime, maxTime;
     private DecimalFormat doubleFormat = new DecimalFormat("##.##");
     private Dimension preferredSize;
+    
+    private ProjectContext projectContext;
 
-    public CPUReportPanel() {
+    public CPUReportPanel(ProjectContext projectContext) {
         super(new BorderLayout());
+
+        this.projectContext = projectContext;
+
         JTabbedPane jTabbedPane = new JTabbedPane();
         this.add(jTabbedPane);
         panelThreadDumps = new ThreadDumpsPanel();
@@ -110,9 +114,9 @@ public class CPUReportPanel extends JPanel {
         this.minTime = minTime;
         this.maxTime = maxTime;
         this.setPreferredSize(preferredSize);
-        panelThreadDumps.init(threadDumps.values(), minTime, maxTime);
+        panelThreadDumps.init(threadDumps.values(), minTime, maxTime, projectContext);
         initMemoryChartPanel();
-        initSampingTreePanel(threadDumps.values());
+        initSamplingTreePanel(threadDumps.values());
         initSamplingSummaryTree(threadDumps.values(), methodSummaries);
     }
 
@@ -121,22 +125,27 @@ public class CPUReportPanel extends JPanel {
             panelMemory.add(new JLabel("No Data available"));
             return;
         }
+        panelMemory.removeAll();
+
         panelMemory.setLayout(new GridLayout(2, 1));
 
         MemoryChartComponent mmc = new MemoryChartComponent(memoryDataList);
         panelMemory.add(new JBScrollPane(mmc));
 
-        ThreadDumpsTree threadDumpsTree = new ThreadDumpsTree(threadDumps.values());
+        ThreadDumpsTree threadDumpsTree = new ThreadDumpsTree(threadDumps.values(), projectContext);
         panelMemory.add(new JBScrollPane(threadDumpsTree));
 
         mmc.addMouseListener(new ChartMouseListenter(threadDumpsTree, minTime, maxTime));
     }
 
-    private void initSampingTreePanel(Collection<ThreadDump> threadDumps) {
+    private void initSamplingTreePanel(Collection<ThreadDump> threadDumps) {
         if (threadDumps == null) {
             panelSamples.add(new JLabel("No data available"));
             return;
         }
+
+        panelSamples.removeAll();
+
         panelSamples.setLayout(new BorderLayout());
         final DefaultMutableTreeNode root = new DefaultMutableTreeNode(new StackTraceTree("", 0));
         for (ThreadDump threadDump : threadDumps) {
@@ -150,7 +159,8 @@ public class CPUReportPanel extends JPanel {
 
         final TreeTable treeTable = new TreeTable(model);
 
-       // treeTable.setPreferredSize(preferredSize);
+        TreeTablePopupTriggerMouseListener treeTablePopupTriggerMouseListener = new TreeTablePopupTriggerMouseListener(treeTable, projectContext);
+        treeTable.addMouseListener(treeTablePopupTriggerMouseListener);
 
         panelSamples.add(new JBScrollPane(treeTable));
     }
@@ -161,8 +171,7 @@ public class CPUReportPanel extends JPanel {
             return;
         }
 
-        //panelSamplingSummary.add(new JBScrollPane(new MethodUsageTreeTable(samplingSummaryTree)));
-        ((SamplingSummaryPanel)panelSamplingSummary).init(methodSummaries, threadDumps, preferredSize);
+        ((SamplingSummaryPanel)panelSamplingSummary).init(methodSummaries, threadDumps, preferredSize, projectContext);
 
     }
 
@@ -182,16 +191,16 @@ public class CPUReportPanel extends JPanel {
 
             @Override
             public Object valueOf(Object o) {
-                StackTraceTree stei = (StackTraceTree) ((DefaultMutableTreeNode) o).getUserObject();
-                return Long.toString(stei.getCount());
+                StackTraceTree stackTraceTree = (StackTraceTree) ((DefaultMutableTreeNode) o).getUserObject();
+                return Long.toString(stackTraceTree.getCount());
             }
         };
         ColumnInfo cpuColumn = new ColumnInfo(CPU_COLUMN_HEADER) {
 
             @Override
             public Object valueOf(Object o) {
-                StackTraceTree stei = (StackTraceTree) ((DefaultMutableTreeNode) o).getUserObject();
-                return Double.toString(stei.getCpuTimeTotal() / NANO);
+                StackTraceTree stackTraceTree = (StackTraceTree) ((DefaultMutableTreeNode) o).getUserObject();
+                return Double.toString(stackTraceTree.getCpuTimeTotal() / NANO);
             }
         };
 

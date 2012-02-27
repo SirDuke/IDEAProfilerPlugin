@@ -22,28 +22,12 @@
  *  ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.ssprofiler.idea.profileplugin.viewer.toolwindow;
-
-import com.intellij.openapi.project.Project;
-import com.intellij.openapi.wm.ToolWindow;
-import com.intellij.openapi.wm.ToolWindowFactory;
-import com.intellij.ui.content.Content;
-import com.intellij.ui.content.ContentFactory;
-import org.ssprofiler.idea.profileplugin.projectcontext.IDEAProjectContext;
-import org.ssprofiler.idea.profileplugin.projectcontext.ProjectContext;
+package org.ssprofiler.idea.profileplugin.projectcontext;
 
 /**
  * User: Ivan Serduk
- * Date: 17.02.12
+ * Date: 20.02.12
  */
-public class SSProfilerToolWindowFactory implements ToolWindowFactory {
-    public void createToolWindowContent(Project project, ToolWindow toolWindow) {
-        toolWindow.setTitle("Test Tool Window");
-
-        ProjectContext ideaProjectContext = new IDEAProjectContext(project);
-
-        ContentFactory contentFactory = ContentFactory.SERVICE.getInstance();
-        Content content = contentFactory.createContent(new ToolWindowContent(ideaProjectContext), "", false);
-        toolWindow.getContentManager().addContent(content);
-    }
+public interface ProjectContext {
+    void openSourceFile(String qualifiedMethodName);
 }
