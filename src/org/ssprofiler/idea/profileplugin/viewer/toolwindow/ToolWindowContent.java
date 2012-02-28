@@ -27,9 +27,9 @@ package org.ssprofiler.idea.profileplugin.viewer.toolwindow;
 import com.intellij.openapi.fileChooser.FileChooser;
 import com.intellij.openapi.fileChooser.FileChooserDescriptor;
 import com.intellij.openapi.ui.Messages;
-import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VirtualFile;
 import org.ssprofiler.idea.profileplugin.projectcontext.ProjectContext;
+import org.ssprofiler.idea.profileplugin.util.PersistentManager;
 import org.ssprofiler.idea.profileplugin.viewer.CPUReportPanel;
 
 import javax.swing.*;
@@ -71,13 +71,14 @@ public class ToolWindowContent extends JPanel {
     }
 
     private void showFileChooserDialogAndLoadSelectedData() {
-        VirtualFile dirUserHome = LocalFileSystem.getInstance().findFileByPath("user.home");
+        VirtualFile initialDir = PersistentManager.getInstance().getLastUsedDirForCpuReports();
         FileChooserDescriptor fileChooserDescriptor = new FileChooserDescriptor(true, false, false, false, false, false);
         fileChooserDescriptor.setTitle("Select CPU report file");
-        VirtualFile file = FileChooser.chooseFile(JOptionPane.getRootFrame(), fileChooserDescriptor, dirUserHome);
+        VirtualFile file = FileChooser.chooseFile(JOptionPane.getRootFrame(), fileChooserDescriptor, initialDir);
 
         if (file != null) {
             String filename = file.getPath();
+            PersistentManager.getInstance().updateLastUsedDirForCpuReports(file.getParent().getPath());
             try {
 
                 cpuReportPanel.loadDataFromFile(filename);

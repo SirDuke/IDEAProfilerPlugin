@@ -24,29 +24,43 @@
 
 package org.ssprofiler.idea.profileplugin.util;
 
-import java.io.File;
-import java.text.DateFormat;
-import java.text.SimpleDateFormat;
-import java.util.Date;
+import com.intellij.ide.util.PropertiesComponent;
+import com.intellij.openapi.vfs.LocalFileSystem;
+import com.intellij.openapi.vfs.VirtualFile;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
- * Created by IntelliJ IDEA.
  * User: Ivan Serduk
- * Date: 09.05.11
+ * Date: 28.02.12
  */
-public class Utils {
-    private static final String DATE_FORMAT_PATTERN = "HHmmss_ddMMyyyy";
+public class PersistentManager {
+    private static final String LAST_USED_DIR_FOR_CPU_REPORTS = "lastUsedDirForCpuReports";
+    
+    private static final PersistentManager instance = new PersistentManager();
+    
+    private PropertiesComponent propertiesComponent = PropertiesComponent.getInstance();
+    private String lastUsedDirForCpuReports;
 
-    public static DateFormat getDateFormat() {
-        return new SimpleDateFormat(DATE_FORMAT_PATTERN);
+    public static PersistentManager getInstance() {
+        return instance;
+    }    
+    
+    private PersistentManager() {
+        lastUsedDirForCpuReports = propertiesComponent.getValue(LAST_USED_DIR_FOR_CPU_REPORTS);
     }
-
-    public static String createHeapDumpFileName(String dir) {
-        StringBuilder filename = new StringBuilder(dir);
-        if (!dir.endsWith(File.separator)) {
-            filename.append(File.separatorChar);
+    
+    public void updateLastUsedDirForCpuReports(@NotNull String lastUsedDirForCpuReports) {
+        this.lastUsedDirForCpuReports = lastUsedDirForCpuReports;
+        propertiesComponent.setValue(LAST_USED_DIR_FOR_CPU_REPORTS, lastUsedDirForCpuReports);
+    }    
+    
+    @Nullable
+    public VirtualFile getLastUsedDirForCpuReports() {
+        if (lastUsedDirForCpuReports != null) {
+            return LocalFileSystem.getInstance().findFileByPath(lastUsedDirForCpuReports);
+        } else {
+            return null;
         }
-        filename.append("heapdump_").append(getDateFormat().format(new Date())).append(".hprof");
-        return filename.toString();
     }
 }
