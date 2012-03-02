@@ -33,13 +33,13 @@ import org.ssprofiler.idea.profileplugin.projectcontext.ProjectContext;
 import org.ssprofiler.model.*;
 
 import javax.swing.*;
+import javax.swing.table.TableModel;
 import javax.swing.tree.DefaultMutableTreeNode;
 import java.awt.*;
 import java.io.IOException;
 import java.text.DecimalFormat;
-import java.util.Collection;
+import java.util.*;
 import java.util.List;
-import java.util.Map;
 
 /**
  * User: Ivan Serduk
@@ -147,17 +147,19 @@ public class CPUReportPanel extends JPanel {
         panelSamples.removeAll();
 
         panelSamples.setLayout(new BorderLayout());
-        final DefaultMutableTreeNode root = new DefaultMutableTreeNode(new StackTraceTree("", 0));
+        final TreeNodeWithSortableChildren root = new TreeNodeWithSortableChildren("Threads");
         for (ThreadDump threadDump : threadDumps) {
             DefaultMutableTreeNode newNode = new DefaultMutableTreeNode(threadDump.getStackTraceTree());
             root.add(newNode);
             buildSamplingTree(newNode, threadDump.getStackTraceTree().getChildren());
-
         }
+        
         final ColumnInfo[] columns = initSamplingTreeTableColumns();
-        TreeTableModel model = new ListTreeTableModelOnColumns(root, columns);
+        ListTreeTableModelOnColumns model = new ListTreeTableModelOnColumns(root, columns);
 
         final TreeTable treeTable = new TreeTable(model);
+        TreeTableRowSorter rowSorter = new TreeTableRowSorter(treeTable.getModel(), model, columns);
+        treeTable.setRowSorter(rowSorter);
 
         TreeTablePopupTriggerMouseListener treeTablePopupTriggerMouseListener = new TreeTablePopupTriggerMouseListener(treeTable, projectContext);
         treeTable.addMouseListener(treeTablePopupTriggerMouseListener);
@@ -191,16 +193,26 @@ public class CPUReportPanel extends JPanel {
 
             @Override
             public Object valueOf(Object o) {
-                StackTraceTree stackTraceTree = (StackTraceTree) ((DefaultMutableTreeNode) o).getUserObject();
-                return Long.toString(stackTraceTree.getCount());
+                DefaultMutableTreeNode treeNode = (DefaultMutableTreeNode) o;
+                if (!treeNode.isRoot()) {
+                    StackTraceTree stackTraceTree = (StackTraceTree) treeNode.getUserObject();
+                    return stackTraceTree.getCount();
+                } else {
+                    return null;
+                }
             }
         };
         ColumnInfo cpuColumn = new ColumnInfo(CPU_COLUMN_HEADER) {
 
             @Override
             public Object valueOf(Object o) {
-                StackTraceTree stackTraceTree = (StackTraceTree) ((DefaultMutableTreeNode) o).getUserObject();
-                return Double.toString(stackTraceTree.getCpuTimeTotal() / NANO);
+                DefaultMutableTreeNode treeNode = (DefaultMutableTreeNode) o;
+                if (!treeNode.isRoot()) {
+                    StackTraceTree stackTraceTree = (StackTraceTree) treeNode.getUserObject();
+                    return stackTraceTree.getCpuTimeTotal() / NANO;
+                } else {
+                    return null;
+                }
             }
         };
 
@@ -213,6 +225,112 @@ public class CPUReportPanel extends JPanel {
             treeNode.add(newNode);
             buildSamplingTree(newNode, subtree.getChildren());
 
+        }
+    }
+    
+    private class TreeNodeWithSortableChildren extends DefaultMutableTreeNode {
+        private TreeNodeWithSortableChildren(Object userObject) {
+            super(userObject);
+        }
+        
+        public void sortChildren(Comparator<DefaultMutableTreeNode> comparator) {
+            Collections.sort(children, comparator);
+        }
+    }
+
+    private class TreeTableRowSorter extends RowSorter<TableModel> {
+        private TableModel tableModel;
+        private ListTreeTableModelOnColumns listTreeTableModel;
+        private TreeNodeWithSortableChildren root;
+        private ColumnInfo[] columns;
+        
+        private SortKey currentSortKey = null;
+
+        private TreeTableRowSorter(TableModel tableModel, ListTreeTableModelOnColumns listTreeTableModel, ColumnInfo[] columns) {
+            this.tableModel = tableModel;
+            this.listTreeTableModel = listTreeTableModel;
+            this.root = (TreeNodeWithSortableChildren) listTreeTableModel.getRoot();
+            this.columns = columns;
+        }
+
+        @Override
+        public TableModel getModel() {
+            return tableModel;
+        }
+
+        @Override
+        public void toggleSortOrder(final int column) {
+            SortOrder sortOrder = SortOrder.ASCENDING;
+            if ((currentSortKey != null) && (currentSortKey.getColumn() == column) && (currentSortKey.getSortOrder() == SortOrder.ASCENDING)) {
+                sortOrder = SortOrder.DESCENDING;
+            }
+            currentSortKey = new SortKey(column, sortOrder);
+            final int sortKoef = (sortOrder == SortOrder.ASCENDING) ? -1 : 1;
+            root.sortChildren(new Comparator<DefaultMutableTreeNode>() {
+                public int compare(DefaultMutableTreeNode treeNode1, DefaultMutableTreeNode treeNode2) {
+                    Comparable value1 = (Comparable) columns[column].valueOf(treeNode1);
+                    Object value2 = columns[column].valueOf(treeNode2);
+                    return sortKoef * value1.compareTo(value2);
+                }
+            });
+            listTreeTableModel.nodeStructureChanged(root);
+        }
+
+        @Override
+        public int convertRowIndexToModel(int index) {
+            return index;
+        }
+
+        @Override
+        public int convertRowIndexToView(int index) {
+            return index;
+        }
+
+        @Override
+        public void setSortKeys(List<? extends SortKey> keys) {
+        }
+
+        @Override
+        public List<? extends SortKey> getSortKeys() {
+            if (currentSortKey != null) {
+                return Collections.singletonList(currentSortKey);
+            } else {
+                return Collections.emptyList();
+            }
+        }
+
+        @Override
+        public int getViewRowCount() {
+            return tableModel.getRowCount();
+        }
+
+        @Override
+        public int getModelRowCount() {
+            return tableModel.getRowCount();
+        }
+
+        @Override
+        public void modelStructureChanged() {
+        }
+
+        @Override
+        public void allRowsChanged() {
+        }
+
+        @Override
+        public void rowsInserted(int firstRow, int endRow) {
+        }
+
+        @Override
+        public void rowsDeleted(int firstRow, int endRow) {
+        }
+
+        @Override
+        public void rowsUpdated(int firstRow, int endRow) {
+        }
+
+        @Override
+        public void rowsUpdated(int firstRow, int endRow, int column) {
         }
     }
 }
