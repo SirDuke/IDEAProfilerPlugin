@@ -25,39 +25,31 @@
 package org.ssprofiler.idea.profileplugin.viewer;
 
 import com.intellij.ui.components.JBScrollPane;
-import com.intellij.ui.treeStructure.treetable.ListTreeTableModelOnColumns;
-import com.intellij.ui.treeStructure.treetable.TreeTable;
-import com.intellij.ui.treeStructure.treetable.TreeTableModel;
-import com.intellij.util.ui.ColumnInfo;
 import org.ssprofiler.idea.profileplugin.projectcontext.ProjectContext;
-import org.ssprofiler.model.*;
+import org.ssprofiler.model.MemoryInfo;
+import org.ssprofiler.model.MethodSummary;
+import org.ssprofiler.model.ProfilerData;
+import org.ssprofiler.model.ThreadDump;
 
 import javax.swing.*;
-import javax.swing.table.TableModel;
-import javax.swing.tree.DefaultMutableTreeNode;
 import java.awt.*;
 import java.io.IOException;
 import java.text.DecimalFormat;
-import java.util.*;
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 
 /**
  * User: Ivan Serduk
  * Date: 14.05.11
  */
 public class CPUReportPanel extends JPanel {
-    private static final long NANO = 1000000000;
-
-    private static final String SAMPLING_TREE_COLUMN_HEADER = "Sampling Tree";
-    private static final String SAMPLES_COLUMN_HEADER = "Samples count";
-    private static final String CPU_COLUMN_HEADER = "CPU time usage";
-
     private static final int PREFERRED_WIDTH = 1000;
     private static final int PREFERRED_HEIGHT = 600;
     private static final Dimension PREFERRED_SIZE = new Dimension(PREFERRED_WIDTH, PREFERRED_HEIGHT);
 
     private ThreadDumpsPanel panelThreadDumps;
-    private JPanel panelSamples;
+    private SamplesPanel panelSamples;
     private JPanel panelMemory;
     private JPanel panelSamplingSummary;
 
@@ -78,7 +70,7 @@ public class CPUReportPanel extends JPanel {
         this.add(jTabbedPane);
         panelThreadDumps = new ThreadDumpsPanel();
         jTabbedPane.add("Threads", panelThreadDumps);
-        panelSamples = new JPanel();
+        panelSamples = new SamplesPanel();
         jTabbedPane.add("Samples", panelSamples);
         panelMemory = new JPanel();
         jTabbedPane.add("Memory", panelMemory);
@@ -139,32 +131,7 @@ public class CPUReportPanel extends JPanel {
     }
 
     private void initSamplingTreePanel(Collection<ThreadDump> threadDumps) {
-        if (threadDumps == null) {
-            panelSamples.add(new JLabel("No data available"));
-            return;
-        }
-
-        panelSamples.removeAll();
-
-        panelSamples.setLayout(new BorderLayout());
-        final TreeNodeWithSortableChildren root = new TreeNodeWithSortableChildren("Threads");
-        for (ThreadDump threadDump : threadDumps) {
-            DefaultMutableTreeNode newNode = new DefaultMutableTreeNode(threadDump.getStackTraceTree());
-            root.add(newNode);
-            buildSamplingTree(newNode, threadDump.getStackTraceTree().getChildren());
-        }
-        
-        final ColumnInfo[] columns = initSamplingTreeTableColumns();
-        ListTreeTableModelOnColumns model = new ListTreeTableModelOnColumns(root, columns);
-
-        final TreeTable treeTable = new TreeTable(model);
-        TreeTableRowSorter rowSorter = new TreeTableRowSorter(treeTable.getModel(), model, columns);
-        treeTable.setRowSorter(rowSorter);
-
-        TreeTablePopupTriggerMouseListener treeTablePopupTriggerMouseListener = new TreeTablePopupTriggerMouseListener(treeTable, projectContext);
-        treeTable.addMouseListener(treeTablePopupTriggerMouseListener);
-
-        panelSamples.add(new JBScrollPane(treeTable));
+        panelSamples.init(threadDumps, projectContext);
     }
 
     private void initSamplingSummaryTree(Collection<ThreadDump> threadDumps, List<MethodSummary> methodSummaries) {
@@ -175,162 +142,5 @@ public class CPUReportPanel extends JPanel {
 
         ((SamplingSummaryPanel)panelSamplingSummary).init(methodSummaries, threadDumps, preferredSize, projectContext);
 
-    }
-
-    private ColumnInfo[] initSamplingTreeTableColumns() {
-        ColumnInfo treeColumn = new ColumnInfo(SAMPLING_TREE_COLUMN_HEADER) {
-            @Override
-            public Object valueOf(Object o) {
-                return ((DefaultMutableTreeNode) o).getUserObject();
-            }
-
-            @Override
-            public Class getColumnClass() {
-                return TreeTableModel.class;
-            }
-        };
-        ColumnInfo countColumn = new ColumnInfo(SAMPLES_COLUMN_HEADER) {
-
-            @Override
-            public Object valueOf(Object o) {
-                DefaultMutableTreeNode treeNode = (DefaultMutableTreeNode) o;
-                if (!treeNode.isRoot()) {
-                    StackTraceTree stackTraceTree = (StackTraceTree) treeNode.getUserObject();
-                    return stackTraceTree.getCount();
-                } else {
-                    return null;
-                }
-            }
-        };
-        ColumnInfo cpuColumn = new ColumnInfo(CPU_COLUMN_HEADER) {
-
-            @Override
-            public Object valueOf(Object o) {
-                DefaultMutableTreeNode treeNode = (DefaultMutableTreeNode) o;
-                if (!treeNode.isRoot()) {
-                    StackTraceTree stackTraceTree = (StackTraceTree) treeNode.getUserObject();
-                    return stackTraceTree.getCpuTimeTotal() / NANO;
-                } else {
-                    return null;
-                }
-            }
-        };
-
-        return new ColumnInfo[]{treeColumn, countColumn, cpuColumn};
-    }
-
-    private void buildSamplingTree(DefaultMutableTreeNode treeNode, Collection<StackTraceTree> children) {
-        for (StackTraceTree subtree : children) {
-            DefaultMutableTreeNode newNode = new DefaultMutableTreeNode(subtree);
-            treeNode.add(newNode);
-            buildSamplingTree(newNode, subtree.getChildren());
-
-        }
-    }
-    
-    private class TreeNodeWithSortableChildren extends DefaultMutableTreeNode {
-        private TreeNodeWithSortableChildren(Object userObject) {
-            super(userObject);
-        }
-        
-        public void sortChildren(Comparator<DefaultMutableTreeNode> comparator) {
-            Collections.sort(children, comparator);
-        }
-    }
-
-    private class TreeTableRowSorter extends RowSorter<TableModel> {
-        private TableModel tableModel;
-        private ListTreeTableModelOnColumns listTreeTableModel;
-        private TreeNodeWithSortableChildren root;
-        private ColumnInfo[] columns;
-        
-        private SortKey currentSortKey = null;
-
-        private TreeTableRowSorter(TableModel tableModel, ListTreeTableModelOnColumns listTreeTableModel, ColumnInfo[] columns) {
-            this.tableModel = tableModel;
-            this.listTreeTableModel = listTreeTableModel;
-            this.root = (TreeNodeWithSortableChildren) listTreeTableModel.getRoot();
-            this.columns = columns;
-        }
-
-        @Override
-        public TableModel getModel() {
-            return tableModel;
-        }
-
-        @Override
-        public void toggleSortOrder(final int column) {
-            SortOrder sortOrder = SortOrder.ASCENDING;
-            if ((currentSortKey != null) && (currentSortKey.getColumn() == column) && (currentSortKey.getSortOrder() == SortOrder.ASCENDING)) {
-                sortOrder = SortOrder.DESCENDING;
-            }
-            currentSortKey = new SortKey(column, sortOrder);
-            final int sortKoef = (sortOrder == SortOrder.ASCENDING) ? -1 : 1;
-            root.sortChildren(new Comparator<DefaultMutableTreeNode>() {
-                public int compare(DefaultMutableTreeNode treeNode1, DefaultMutableTreeNode treeNode2) {
-                    Comparable value1 = (Comparable) columns[column].valueOf(treeNode1);
-                    Object value2 = columns[column].valueOf(treeNode2);
-                    return sortKoef * value1.compareTo(value2);
-                }
-            });
-            listTreeTableModel.nodeStructureChanged(root);
-        }
-
-        @Override
-        public int convertRowIndexToModel(int index) {
-            return index;
-        }
-
-        @Override
-        public int convertRowIndexToView(int index) {
-            return index;
-        }
-
-        @Override
-        public void setSortKeys(List<? extends SortKey> keys) {
-        }
-
-        @Override
-        public List<? extends SortKey> getSortKeys() {
-            if (currentSortKey != null) {
-                return Collections.singletonList(currentSortKey);
-            } else {
-                return Collections.emptyList();
-            }
-        }
-
-        @Override
-        public int getViewRowCount() {
-            return tableModel.getRowCount();
-        }
-
-        @Override
-        public int getModelRowCount() {
-            return tableModel.getRowCount();
-        }
-
-        @Override
-        public void modelStructureChanged() {
-        }
-
-        @Override
-        public void allRowsChanged() {
-        }
-
-        @Override
-        public void rowsInserted(int firstRow, int endRow) {
-        }
-
-        @Override
-        public void rowsDeleted(int firstRow, int endRow) {
-        }
-
-        @Override
-        public void rowsUpdated(int firstRow, int endRow) {
-        }
-
-        @Override
-        public void rowsUpdated(int firstRow, int endRow, int column) {
-        }
     }
 }
